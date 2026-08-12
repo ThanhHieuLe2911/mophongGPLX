@@ -29,9 +29,12 @@ def grade_situation(
     return SituationResult(situation_id=situation.id, parts=tuple(results))
 
 
-def score_on_ten(results: list[SituationResult]) -> float:
-    if not results:
+def score_on_ten(
+    results: list[SituationResult],
+    total_situations: int | None = None,
+) -> float:
+    denominator = total_situations if total_situations is not None else len(results)
+    if denominator <= 0:
         return 0.0
     raw_score = sum(result.score for result in results)
-    return round(raw_score / len(results) * 10, 2)
-
+    return round(raw_score / denominator * 10, 2)

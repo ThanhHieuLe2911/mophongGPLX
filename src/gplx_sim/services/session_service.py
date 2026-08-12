@@ -29,6 +29,13 @@ class SessionState:
         self.results.append(result)
         return result
 
+    def complete_unanswered(self) -> None:
+        """Chấm các tình huống chưa nộp là 0 điểm khi hết giờ."""
+        completed_ids = {result.situation_id for result in self.results}
+        for situation in self.situations:
+            if situation.id not in completed_ids:
+                self.results.append(grade_situation(situation, {}))
+
     def move_next(self) -> bool:
         if self.is_last:
             return False
@@ -36,7 +43,8 @@ class SessionState:
         return True
 
     def finish(self, history: HistoryRepository) -> float:
-        final_score = score_on_ten(self.results)
+        self.complete_unanswered()
+        final_score = score_on_ten(self.results, len(self.situations))
         history.complete_session(
             self.session_id,
             self.situations,
@@ -44,4 +52,3 @@ class SessionState:
             final_score,
         )
         return final_score
-

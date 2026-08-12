@@ -1,6 +1,6 @@
 # Nội dung ngoại tuyến
 
-`content.db` được ứng dụng tạo ở lần chạy đầu tiên với một tình huống mẫu.
+- `bundled_content.db`: database gốc được tạo tự động từ catalog 120 tình huống và được đóng cùng ứng dụng.
+- `videos/`: đặt đúng 120 file `1.mp4` đến `120.mp4` tại đây.
 
-Đặt video thật trong thư mục `videos/` và cập nhật trường `video_filename` trong bảng `situations`. Không lưu lịch sử người dùng trong thư mục này.
-
+Database mà ứng dụng chỉnh sửa nằm tại `%LOCALAPPDATA%\MoPhongGPLX\content.db`, không nằm trong thư mục này. Chạy `scripts\verify-content.ps1` để kiểm tra đủ database và video trước khi đóng gói.

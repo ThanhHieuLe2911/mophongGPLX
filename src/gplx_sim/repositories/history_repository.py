@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+from contextlib import closing
 from datetime import datetime
 from pathlib import Path
 
@@ -12,7 +13,7 @@ class HistoryRepository:
         self._database_path = database_path
 
     def start_session(self, mode: str, situations: list[Situation]) -> int:
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             cursor = connection.execute(
                 """
                 INSERT INTO sessions(mode, started_at, total_situations)
@@ -42,7 +43,7 @@ class HistoryRepository:
         score_on_ten: float,
     ) -> None:
         by_situation = {result.situation_id: result for result in results}
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             for situation in situations:
                 result = by_situation.get(situation.id)
                 if result is None:
@@ -93,7 +94,7 @@ class HistoryRepository:
             )
 
     def recent_sessions(self, limit: int = 50) -> list[sqlite3.Row]:
-        with self._connect() as connection:
+        with closing(self._connect()) as connection:
             return connection.execute(
                 """
                 SELECT id, mode, started_at, completed_at, total_situations, score, score_on_ten
@@ -109,4 +110,3 @@ class HistoryRepository:
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
         return connection
-

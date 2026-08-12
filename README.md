@@ -1,14 +1,22 @@
 # Mô phỏng GPLX
 
-Ứng dụng desktop Windows phục vụ tự luyện và thi thử tình huống giao thông, chạy hoàn toàn offline.
+Ứng dụng desktop Windows phục vụ ôn tập và thi mô phỏng tình huống giao thông. Hai chế độ ôn tập chạy hoàn toàn offline; phần thi tốt nghiệp được chuẩn bị giao diện để tích hợp máy chủ sau.
+
+## Chức năng hiện có
+
+- Trang chủ gồm hai lựa chọn: **Ôn tập** và **Thi tốt nghiệp**.
+- **Tự luyện:** chọn ngẫu nhiên từ 1–20 tình huống, trả lời đủ 4 phần và nhận phản hồi đúng/sai ngay.
+- **Thi thử:** lấy ngẫu nhiên 10 tình huống, mặc định 15 phút, không lộ đáp án trong lúc làm và tự nộp khi hết giờ.
+- Catalog chuẩn có 6 chương, 120 tình huống, 480 phần câu hỏi và 1.920 phương án được trích từ `MP1.pdf`.
+- Mỗi phần câu hỏi luôn có đúng 4 phương án A–D và đúng một đáp án đúng.
+- **Thi tốt nghiệp:** đã có màn hình chọn khóa thi, nhập SBD và vùng hiển thị thông tin thí sinh. Việc kết nối máy chủ sẽ triển khai sau.
 
 ## Công nghệ
 
 - Python 3.11–3.13
-- PySide6 / Qt 6
-- Qt Multimedia và FFmpeg backend
+- PySide6 / Qt 6, Qt Multimedia và FFmpeg backend
 - SQLite cho nội dung và lịch sử
-- PyInstaller `--onedir` để tạo bản phát hành
+- PyInstaller `--onedir` để tạo bản phát hành offline
 
 ## Chạy ở môi trường phát triển
 
@@ -17,13 +25,28 @@
 .\scripts\run.ps1
 ```
 
-Ứng dụng tự tạo dữ liệu mẫu lần đầu. Dữ liệu thật được đặt tại `content/content.db`; video đặt tại `content/videos`.
+Ở lần chạy đầu tiên, ứng dụng tự tạo `content/bundled_content.db` từ catalog được đóng trong mã nguồn và tự cài bản đang dùng vào `%LOCALAPPDATA%\MoPhongGPLX\content.db`. Người dùng không cần cài SQLite hoặc nhập SQL.
+
+## Đặt và kiểm tra video
+
+Chép trực tiếp 120 file `1.mp4` đến `120.mp4` vào:
+
+```text
+content\videos\
+```
+
+Sau đó kiểm tra database và video:
+
+```powershell
+.\scripts\verify-content.ps1
+```
+
+Kết quả đúng phải báo database hợp lệ và `Đã đủ 120/120 video`.
 
 ## Kiểm thử
 
 ```powershell
-$env:PYTHONPATH = "$PWD\src"
-.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+.\.venv\Scripts\python.exe -m pytest -v
 ```
 
 ## Build bản offline
@@ -32,17 +55,38 @@ $env:PYTHONPATH = "$PWD\src"
 .\scripts\build.ps1
 ```
 
-Kết quả nằm trong `dist/MoPhongGPLX`. Phải phân phối nguyên thư mục; không chỉ sao chép riêng EXE.
+Kết quả nằm trong `dist\MoPhongGPLX` với cấu trúc:
 
-## Vị trí dữ liệu
+```text
+MoPhongGPLX\
+├── MoPhongGPLX.exe
+├── _internal\
+└── content\
+    ├── bundled_content.db
+    └── videos\
+        ├── 1.mp4
+        └── ... 120.mp4
+```
 
-- Nội dung dùng chung: `content/content.db` và `content/videos/`.
-- Lịch sử người dùng: `%LOCALAPPDATA%\MoPhongGPLX\history.db`.
-- Khi phát triển, có thể đặt biến `GPLX_RUNTIME_DIR` để chuyển lịch sử sang một thư mục thử nghiệm.
+Phải phân phối nguyên thư mục `dist\MoPhongGPLX`; không sao chép riêng file EXE.
 
-## Bước tích hợp dữ liệu thật
+## Các lớp dữ liệu
 
-1. Chuẩn hóa video thành MP4/H.264/AAC và đặt tên theo mã tình huống.
-2. Chuyển bộ câu hỏi vào schema trong `src/gplx_sim/data/schema_content.sql`.
-3. Chạy kiểm tra dữ liệu và video trước khi phát hành.
-4. Tạo bộ cài từ thư mục `dist/MoPhongGPLX` bằng Inno Setup hoặc WiX.
+- Nguồn có thể tái tạo và lưu trong Git: `src/gplx_sim/data/content_catalog.json`.
+- Database gốc đi cùng bản phát hành: `content/bundled_content.db`.
+- Database nội dung đang dùng: `%LOCALAPPDATA%\MoPhongGPLX\content.db`.
+- Bản sao trước khi nâng phiên bản: `%LOCALAPPDATA%\MoPhongGPLX\content.before_update.db`.
+- Lịch sử tự luyện/thi thử: `%LOCALAPPDATA%\MoPhongGPLX\history.db`.
+- Video dùng chung: `content/videos/` cạnh ứng dụng.
+
+Nếu database đang dùng bị thiếu bảng hoặc sai cấu trúc, ứng dụng sao lưu rồi tự khôi phục từ database gốc. Các chỉnh sửa hợp lệ của trang quản trị không bị ghi đè khi mở lại cùng phiên bản.
+
+## Tái tạo catalog từ PDF
+
+Chỉ chạy khi `MP1.pdf` thay đổi:
+
+```powershell
+.\.venv\Scripts\python.exe .\scripts\import_mp1.py .\MP1.pdf .\src\gplx_sim\data\content_catalog.json
+```
+
+Trình nhập kiểm tra đúng 120 trang, 6 chương, 4 phần mỗi tình huống, 4 phương án mỗi phần và nhận diện đáp án được tô đỏ.

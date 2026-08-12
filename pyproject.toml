@@ -28,7 +28,7 @@ package-dir = {"" = "src"}
 where = ["src"]
 
 [tool.setuptools.package-data]
-gplx_sim = ["data/*.sql", "resources/*.qss"]
+gplx_sim = ["data/*.sql", "data/*.json", "resources/*.qss"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

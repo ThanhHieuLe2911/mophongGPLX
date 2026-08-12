@@ -16,3 +16,5 @@ content/*.db
 *.mov
 *.exe
 *.zip
+*.sql
+*.pdf

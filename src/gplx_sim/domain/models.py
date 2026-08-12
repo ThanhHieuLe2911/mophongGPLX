@@ -7,7 +7,8 @@ from pathlib import Path
 
 class SessionMode(str, Enum):
     PRACTICE = "practice"
-    EXAM = "exam"
+    MOCK_EXAM = "mock_exam"
+    OFFICIAL_EXAM = "official_exam"
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,4 +59,3 @@ class SituationResult:
     @property
     def score(self) -> float:
         return self.correct_parts * 0.25
-

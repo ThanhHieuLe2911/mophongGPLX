@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import random
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 
 from gplx_sim.domain.models import Answer, QuestionPart, Situation
@@ -12,16 +12,16 @@ class ContentRepository:
         self._database_path = database_path
 
     def count_situations(self) -> int:
-        with self._connect() as connection:
+        with closing(self._connect()) as connection:
             row = connection.execute(
                 "SELECT COUNT(*) AS total FROM situations WHERE active = 1"
             ).fetchone()
         return int(row["total"])
 
-    def get_random_situations(self, limit: int, answer_limit: int = 3) -> list[Situation]:
+    def get_random_situations(self, limit: int) -> list[Situation]:
         if limit < 1:
             return []
-        with self._connect() as connection:
+        with closing(self._connect()) as connection:
             rows = connection.execute(
                 """
                 SELECT s.id
@@ -32,10 +32,10 @@ class ContentRepository:
                 """,
                 (limit,),
             ).fetchall()
-        return [self.get_situation(int(row["id"]), answer_limit) for row in rows]
+        return [self.get_situation(int(row["id"])) for row in rows]
 
-    def get_situation(self, situation_id: int, answer_limit: int = 3) -> Situation:
-        with self._connect() as connection:
+    def get_situation(self, situation_id: int) -> Situation:
+        with closing(self._connect()) as connection:
             situation_row = connection.execute(
                 """
                 SELECT s.id, s.code, s.title, s.video_filename, c.name AS chapter
@@ -69,7 +69,7 @@ class ContentRepository:
                     """,
                     (part_row["id"],),
                 ).fetchall()
-                answers = self._choose_answers(answer_rows, answer_limit)
+                answers = self._load_answers(answer_rows)
                 parts.append(
                     QuestionPart(
                         id=int(part_row["id"]),
@@ -89,23 +89,20 @@ class ContentRepository:
         )
 
     @staticmethod
-    def _choose_answers(rows: list[sqlite3.Row], answer_limit: int) -> tuple[Answer, ...]:
+    def _load_answers(rows: list[sqlite3.Row]) -> tuple[Answer, ...]:
         answers = [
             Answer(id=int(row["id"]), text=str(row["answer_text"]), is_correct=bool(row["is_correct"]))
             for row in rows
         ]
         correct = [answer for answer in answers if answer.is_correct]
-        distractors = [answer for answer in answers if not answer.is_correct]
+        if len(answers) != 4:
+            raise ValueError("Mỗi phần câu hỏi phải có đúng bốn phương án")
         if len(correct) != 1:
             raise ValueError("Mỗi phần câu hỏi phải có đúng một đáp án đúng")
-
-        selected = correct + random.sample(distractors, min(max(answer_limit - 1, 0), len(distractors)))
-        random.shuffle(selected)
-        return tuple(selected)
+        return tuple(answers)
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self._database_path)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
         return connection
-

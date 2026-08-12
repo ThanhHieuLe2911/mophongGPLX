@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import sys
+import sqlite3
 from importlib.resources import files
 
 from PySide6.QtWidgets import QApplication, QMessageBox
 
-from gplx_sim.bootstrap import initialize_databases
+from gplx_sim.bootstrap import ContentInitializationError, initialize_databases
 from gplx_sim.paths import AppPaths
 from gplx_sim.repositories.content_repository import ContentRepository
 from gplx_sim.repositories.history_repository import HistoryRepository
@@ -22,7 +23,7 @@ def main() -> int:
     paths = AppPaths.discover()
     try:
         initialize_databases(paths)
-    except OSError as error:
+    except (ContentInitializationError, OSError, sqlite3.DatabaseError, ValueError) as error:
         QMessageBox.critical(None, "Không thể khởi tạo", f"Không thể tạo dữ liệu ứng dụng:\n{error}")
         return 1
 
@@ -37,4 +38,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

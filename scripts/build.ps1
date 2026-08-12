@@ -9,7 +9,8 @@ if (-not (Test-Path -LiteralPath $python)) {
 Push-Location $projectRoot
 try {
     $env:PYTHONPATH = Join-Path $projectRoot "src"
-    & $python -c "from gplx_sim.bootstrap import initialize_databases; from gplx_sim.paths import AppPaths; initialize_databases(AppPaths.discover())"
+    $bundledDatabase = Join-Path $projectRoot "content\bundled_content.db"
+    & $python -m gplx_sim.data_builder $bundledDatabase
 
     & $python -m PyInstaller `
         --noconfirm `
@@ -25,7 +26,7 @@ try {
 
     $contentDestination = Join-Path $projectRoot "dist\MoPhongGPLX\content"
     New-Item -ItemType Directory -Force -Path $contentDestination | Out-Null
-    Copy-Item -LiteralPath (Join-Path $projectRoot "content\content.db") -Destination $contentDestination -Force
+    Copy-Item -LiteralPath $bundledDatabase -Destination $contentDestination -Force
     Copy-Item -LiteralPath (Join-Path $projectRoot "content\videos") -Destination $contentDestination -Recurse -Force
     Write-Host "Build hoan tat: dist\MoPhongGPLX"
 }

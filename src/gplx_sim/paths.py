@@ -14,7 +14,11 @@ class AppPaths:
 
     @property
     def content_database(self) -> Path:
-        return self.content_directory / "content.db"
+        return self.runtime_directory / "content.db"
+
+    @property
+    def bundled_content_database(self) -> Path:
+        return self.content_directory / "bundled_content.db"
 
     @property
     def videos_directory(self) -> Path:
@@ -50,4 +54,3 @@ class AppPaths:
         self.content_directory.mkdir(parents=True, exist_ok=True)
         self.videos_directory.mkdir(parents=True, exist_ok=True)
         self.runtime_directory.mkdir(parents=True, exist_ok=True)
-

@@ -1,5 +1,10 @@
 PRAGMA foreign_keys = ON;
 
+CREATE TABLE IF NOT EXISTS content_metadata (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS chapters (
     id INTEGER PRIMARY KEY,
     code TEXT NOT NULL UNIQUE,
@@ -35,7 +40,8 @@ CREATE TABLE IF NOT EXISTS answers (
 CREATE TABLE IF NOT EXISTS practice_sets (
     id INTEGER PRIMARY KEY,
     code TEXT NOT NULL UNIQUE,
-    name TEXT NOT NULL
+    name TEXT NOT NULL,
+    active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1))
 );
 
 CREATE TABLE IF NOT EXISTS practice_set_items (
@@ -44,4 +50,3 @@ CREATE TABLE IF NOT EXISTS practice_set_items (
     display_order INTEGER NOT NULL,
     PRIMARY KEY (practice_set_id, situation_id)
 );
-
