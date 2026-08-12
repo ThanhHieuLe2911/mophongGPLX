@@ -1,0 +1,98 @@
+QWidget {
+    font-family: "Segoe UI";
+    font-size: 15px;
+    color: #17202a;
+    background: #f3f6fa;
+}
+
+QLabel#heading {
+    font-size: 30px;
+    font-weight: 800;
+    color: #123a67;
+}
+
+QLabel#subtitle {
+    color: #607080;
+    font-size: 16px;
+}
+
+QLabel#sectionTitle {
+    font-size: 19px;
+    font-weight: 700;
+    color: #123a67;
+}
+
+QLabel#score {
+    font-size: 48px;
+    font-weight: 800;
+    color: #087f5b;
+}
+
+QFrame#card, QGroupBox {
+    background: white;
+    border: 1px solid #dce4ed;
+    border-radius: 10px;
+}
+
+QGroupBox {
+    margin-top: 14px;
+    padding: 18px 12px 12px 12px;
+    font-weight: 700;
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 12px;
+    padding: 0 6px;
+}
+
+QComboBox, QSpinBox {
+    min-height: 38px;
+    padding: 0 10px;
+    background: white;
+    border: 1px solid #becbd9;
+    border-radius: 6px;
+}
+
+QPushButton {
+    min-height: 40px;
+    padding: 0 18px;
+    background: white;
+    border: 1px solid #b8c5d2;
+    border-radius: 7px;
+    font-weight: 600;
+}
+
+QPushButton:hover {
+    background: #e9f1fa;
+}
+
+QPushButton#primaryButton {
+    color: white;
+    background: #1769aa;
+    border-color: #1769aa;
+}
+
+QPushButton#primaryButton:hover {
+    background: #0f568f;
+}
+
+QPushButton#dangerButton {
+    color: white;
+    background: #c92a2a;
+    border-color: #c92a2a;
+}
+
+QRadioButton {
+    spacing: 10px;
+    min-height: 32px;
+    padding: 5px;
+    font-weight: 400;
+}
+
+QScrollArea, QVideoWidget {
+    background: #111820;
+    border: 1px solid #cad5e0;
+    border-radius: 7px;
+}
+
