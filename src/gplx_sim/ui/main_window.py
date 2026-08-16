@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import unicodedata
+from datetime import datetime
 from pathlib import Path
 
 from PySide6.QtCore import QSize, Qt, QTimer, QUrl, Signal
-from PySide6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
+from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
 from PySide6.QtMultimediaWidgets import QVideoWidget
 from PySide6.QtWidgets import (
@@ -137,7 +138,14 @@ class SourceOption(QFrame):
 class SituationCountSelector(QWidget):
     valueChanged = Signal(int)
 
-    def __init__(self, maximum: int):
+    def __init__(
+        self,
+        maximum: int,
+        *,
+        minimum: int = 1,
+        default: int = 10,
+        suffix: str = " tình huống",
+    ):
         super().__init__()
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -148,18 +156,21 @@ class SituationCountSelector(QWidget):
         self.value_box = QSpinBox()
         self.value_box.setObjectName("countValue")
         self.value_box.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
+        self.value_box.setReadOnly(True)
+        self.value_box.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.value_box.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.value_box.setRange(1, max(1, maximum))
-        self.value_box.setValue(min(10, maximum))
-        self.value_box.setSuffix(" tình huống")
+        upper_bound = max(minimum, maximum)
+        self.value_box.setRange(minimum, upper_bound)
+        self.value_box.setValue(min(max(default, minimum), upper_bound))
+        self.value_box.setSuffix(suffix)
         self.plus = QPushButton("+")
         self.plus.setObjectName("stepButton")
         self.plus.setToolTip("Tăng một tình huống")
         for button in (self.minus, self.plus):
             button.setFixedSize(48, 48)
             button.setAutoRepeat(True)
-        self.minus.clicked.connect(self.value_box.stepDown)
-        self.plus.clicked.connect(self.value_box.stepUp)
+        self.minus.clicked.connect(lambda: self._step_value(-1))
+        self.plus.clicked.connect(lambda: self._step_value(1))
         self.value_box.valueChanged.connect(self._value_changed)
         layout.addWidget(self.minus)
         layout.addWidget(self.value_box, 1)
@@ -169,10 +180,50 @@ class SituationCountSelector(QWidget):
     def value(self) -> int:
         return self.value_box.value()
 
+    def _step_value(self, offset: int) -> None:
+        self.value_box.setValue(self.value_box.value() + offset)
+        self.value_box.lineEdit().deselect()
+
     def _value_changed(self, value: int) -> None:
         self.minus.setEnabled(value > self.value_box.minimum())
         self.plus.setEnabled(value < self.value_box.maximum())
+        self.value_box.lineEdit().deselect()
         self.valueChanged.emit(value)
+
+
+class SituationCheckButton(QPushButton):
+    def __init__(self):
+        super().__init__()
+        self.setObjectName("situationCheckBox")
+        self.setCheckable(True)
+        self.setFixedSize(16, 16)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+
+    def paintEvent(self, event) -> None:
+        del event
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        box = self.rect().adjusted(1, 1, -1, -1)
+        if self.isChecked():
+            background = QColor("#1769aa")
+            border = QColor("#0f568f")
+        elif self.underMouse():
+            background = QColor("#eaf4ff")
+            border = QColor("#1769aa")
+        else:
+            background = QColor("#ffffff")
+            border = QColor("#607d9b")
+        painter.setBrush(background)
+        painter.setPen(QPen(border, 1.2))
+        painter.drawRoundedRect(box, 3, 3)
+        if self.isChecked():
+            pen = QPen(QColor("#ffffff"), 2)
+            pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+            pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+            painter.setPen(pen)
+            painter.drawLine(3, 8, 6, 11)
+            painter.drawLine(6, 11, 12, 4)
+        painter.end()
 
 
 class SituationSelectionDialog(QDialog):
@@ -188,7 +239,6 @@ class SituationSelectionDialog(QDialog):
         self._situations = repository.list_situations()
         self._selected_ids = set(selected_ids or set())
         self._selection_boxes: dict[int, QPushButton] = {}
-        self._checked_icon = self._create_checked_icon()
         self._updating_table = False
 
         root = QVBoxLayout(self)
@@ -239,14 +289,8 @@ class SituationSelectionDialog(QDialog):
             check_host.setObjectName("situationCheckHost")
             check_layout = QHBoxLayout(check_host)
             check_layout.setContentsMargins(0, 0, 0, 0)
-            check_button = QPushButton()
-            check_button.setObjectName("situationCheckBox")
-            check_button.setCheckable(True)
+            check_button = SituationCheckButton()
             check_button.setChecked(situation.id in self._selected_ids)
-            check_button.setIcon(
-                self._checked_icon if check_button.isChecked() else QIcon()
-            )
-            check_button.setIconSize(QSize(18, 18))
             check_button.setToolTip(f"Chọn {situation.code}")
             check_button.toggled.connect(
                 lambda checked, button=check_button, situation_id=situation.id: self._selection_toggled(
@@ -296,21 +340,6 @@ class SituationSelectionDialog(QDialog):
         return sorted(self._selected_ids)
 
     @staticmethod
-    def _create_checked_icon() -> QIcon:
-        pixmap = QPixmap(18, 18)
-        pixmap.fill(Qt.GlobalColor.transparent)
-        painter = QPainter(pixmap)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        pen = QPen(QColor("#ffffff"), 3)
-        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
-        painter.setPen(pen)
-        painter.drawLine(3, 9, 7, 13)
-        painter.drawLine(7, 13, 15, 4)
-        painter.end()
-        return QIcon(pixmap)
-
-    @staticmethod
     def _search_key(value: str) -> str:
         decomposed = unicodedata.normalize("NFD", value)
         return "".join(character for character in decomposed if not unicodedata.combining(character)).casefold()
@@ -331,7 +360,7 @@ class SituationSelectionDialog(QDialog):
         situation_id: int,
         checked: bool,
     ) -> None:
-        button.setIcon(self._checked_icon if checked else QIcon())
+        button.update()
         if self._updating_table:
             return
         if checked:
@@ -553,10 +582,13 @@ class StudySetupPage(QWidget):
         custom_layout.addStretch()
         card_layout.addWidget(self.custom_row)
 
-        self.duration = QSpinBox()
-        self.duration.setRange(1, 30)
-        self.duration.setValue(15)
-        self.duration.setSuffix(" phút")
+        self.duration_selector = SituationCountSelector(
+            30,
+            minimum=10,
+            default=15,
+            suffix=" phút",
+        )
+        self.duration = self.duration_selector.value_box
         self.duration.valueChanged.connect(self._sync_mode_controls)
         self.duration_row = QWidget()
         duration_layout = QHBoxLayout(self.duration_row)
@@ -564,7 +596,7 @@ class StudySetupPage(QWidget):
         duration_label = QLabel("Tổng thời gian")
         duration_label.setObjectName("fieldLabel")
         duration_layout.addWidget(duration_label)
-        duration_layout.addWidget(self.duration, 1)
+        duration_layout.addWidget(self.duration_selector, 1)
         card_layout.addWidget(self.duration_row)
         layout.addWidget(card)
 
@@ -876,11 +908,21 @@ class SessionPage(QWidget):
 
         footer = QHBoxLayout()
         self.progress_label = QLabel()
+        self.previous_button = QPushButton("Câu trước")
+        self.previous_button.clicked.connect(lambda: self._move_relative(-1))
+        self.next_button = QPushButton("Câu tiếp")
+        self.next_button.clicked.connect(lambda: self._move_relative(1))
+        self.finish_button = QPushButton("Kết thúc sớm")
+        self.finish_button.setObjectName("dangerButton")
+        self.finish_button.clicked.connect(self._request_finish)
         self.submit_button = QPushButton("Kiểm tra đáp án")
         self.submit_button.setObjectName("primaryButton")
         self.submit_button.clicked.connect(self._submit)
         footer.addWidget(self.progress_label)
         footer.addStretch()
+        footer.addWidget(self.previous_button)
+        footer.addWidget(self.next_button)
+        footer.addWidget(self.finish_button)
         footer.addWidget(self.submit_button)
         root.addLayout(footer)
 
@@ -902,12 +944,17 @@ class SessionPage(QWidget):
         self._clear_questions()
         self._checked = False
         situation = self._state.current
-        mode_name = "Thi thử" if self._state.mode == "mock_exam" else "Tự luyện"
-        self.position_label.setText(f"{mode_name} · Tình huống số {situation.id}")
+        if self._state.mode == "practice":
+            title = f"Tự luyện · Tình huống số {situation.id}"
+        else:
+            mode_name = (
+                "Thi tốt nghiệp"
+                if self._state.mode == "official_exam"
+                else "Thi thử"
+            )
+            title = f"{mode_name} · Câu số {self._state.current_index + 1}"
+        self.position_label.setText(title)
         self._update_progress_label()
-        self.submit_button.setText(
-            "Nộp câu trả lời" if self._state.mode == "mock_exam" else "Kiểm tra đáp án"
-        )
 
         for index, part in enumerate(situation.parts, start=1):
             box = QGroupBox(f"Phần {index}: {part.prompt}")
@@ -919,6 +966,7 @@ class SessionPage(QWidget):
                 label = chr(ord("A") + answer_index)
                 option = AnswerOption(label, answer.text)
                 group.addButton(option.radio, answer.id)
+                option.radio.toggled.connect(self._answer_selection_changed)
                 self._answer_options[answer.id] = option
                 box_layout.addWidget(option)
             self.questions_layout.addWidget(box)
@@ -943,13 +991,9 @@ class SessionPage(QWidget):
         if existing_result is not None and self._state.mode == "practice":
             self._show_feedback(existing_result)
             self._checked = True
-            self.submit_button.setText(
-                "Xem kết quả"
-                if len(self._state.results) == len(self._state.situations)
-                else "Câu tiếp theo"
-            )
         self._load_video(situation)
         self._update_quick_navigation()
+        self._update_action_controls()
 
     def _load_video(self, situation: Situation) -> None:
         video_path = situation.video_path(self._videos_directory)
@@ -1002,7 +1046,9 @@ class SessionPage(QWidget):
     def _submit(self) -> None:
         assert self._state is not None
         if self._checked:
-            self._advance_or_finish()
+            return
+        if self._is_exam_mode() and self._all_situations_answered():
+            self._confirm_complete_exam()
             return
         selections = self._selected_answers()
         if len(selections) != len(self._groups):
@@ -1015,13 +1061,129 @@ class SessionPage(QWidget):
         if self._state.mode == "practice":
             self._show_feedback(result)
             self._checked = True
-            self.submit_button.setText(
-                "Xem kết quả"
-                if len(self._state.results) == len(self._state.situations)
-                else "Câu tiếp theo"
-            )
+            self._update_action_controls()
         else:
             self._advance_or_finish()
+
+    def _answer_selection_changed(self) -> None:
+        if self._state is None or self._checked:
+            return
+        if self._result_for_situation(self._state.current.id) is not None:
+            return
+        selections = self._selected_answers()
+        if selections:
+            self._draft_selections[self._state.current.id] = selections
+        else:
+            self._draft_selections.pop(self._state.current.id, None)
+        self._update_action_controls()
+
+    def _update_action_controls(self) -> None:
+        if self._state is None:
+            return
+        self.previous_button.setEnabled(self._state.current_index > 0)
+        self.next_button.setEnabled(self._state.current_index < len(self._state.situations) - 1)
+        all_answered = self._all_situations_answered()
+        if self._is_exam_mode():
+            self.finish_button.setText("Kết thúc sớm")
+            self.finish_button.setVisible(not all_answered)
+        else:
+            self.finish_button.setVisible(True)
+            self.finish_button.setText(
+                "Kết thúc bài thi" if all_answered else "Kết thúc sớm"
+            )
+
+        if self._is_exam_mode() and all_answered:
+            self.submit_button.setText("Hoàn thành bài thi")
+            self.submit_button.setEnabled(True)
+            return
+
+        existing_result = self._result_for_situation(self._state.current.id)
+        if existing_result is not None:
+            label = (
+                "Đã kiểm tra đáp án"
+                if self._state.mode == "practice"
+                else "Đã nộp câu trả lời"
+            )
+            self.submit_button.setText(label)
+            self.submit_button.setEnabled(False)
+            return
+
+        remaining = max(0, len(self._groups) - len(self._selected_answers()))
+        if remaining:
+            self.submit_button.setText(f"Còn {remaining} đáp án chưa chọn")
+            self.submit_button.setEnabled(False)
+        else:
+            self.submit_button.setText(
+                "Nộp câu trả lời"
+                if self._state.mode == "mock_exam"
+                else "Kiểm tra đáp án"
+            )
+            self.submit_button.setEnabled(True)
+
+    def _is_exam_mode(self) -> bool:
+        return self._state is not None and self._state.mode in {
+            "mock_exam",
+            "official_exam",
+        }
+
+    def _confirm_complete_exam(self) -> None:
+        answer = QMessageBox.question(
+            self,
+            "Xác nhận nộp bài",
+            "Tất cả các câu trả lời đã được ghi, bạn có chắc chắn nộp bài không?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer == QMessageBox.StandardButton.Yes:
+            self._finish_session("Đã hoàn thành")
+
+    def _all_situations_answered(self) -> bool:
+        if self._state is None:
+            return False
+        results = {result.situation_id: result for result in self._state.results}
+        for situation in self._state.situations:
+            result = results.get(situation.id)
+            if result is not None:
+                if any(part.selected_answer_id is None for part in result.parts):
+                    return False
+                continue
+            selections = self._draft_selections.get(situation.id, {})
+            if len(selections) != len(situation.parts):
+                return False
+        return True
+
+    def _remaining_answer_count(self) -> int:
+        if self._state is None:
+            return 0
+        results = {result.situation_id: result for result in self._state.results}
+        remaining = 0
+        for situation in self._state.situations:
+            result = results.get(situation.id)
+            if result is not None:
+                remaining += sum(part.selected_answer_id is None for part in result.parts)
+            else:
+                remaining += len(situation.parts) - len(
+                    self._draft_selections.get(situation.id, {})
+                )
+        return remaining
+
+    def _request_finish(self) -> None:
+        if self._state is None:
+            return
+        self._remember_current_selections()
+        remaining = self._remaining_answer_count()
+        if remaining:
+            message = (
+                f"Bạn vẫn còn {remaining} đáp án chưa chọn. Các đáp án còn thiếu sẽ được "
+                "tính 0 điểm. Bạn muốn kết thúc sớm?"
+            )
+            reason = "Kết thúc sớm"
+        else:
+            message = "Bạn đã trả lời đầy đủ. Bạn muốn kết thúc và nộp bài?"
+            reason = "Đã hoàn thành"
+        answer = QMessageBox.question(self, "Xác nhận kết thúc", message)
+        if answer == QMessageBox.StandardButton.Yes:
+            self._finish_session(reason)
 
     def _show_feedback(self, result: SituationResult) -> None:
         for option in self._answer_options.values():
@@ -1074,6 +1236,13 @@ class SessionPage(QWidget):
         self._remember_current_selections()
         self._state.move_to(index)
         self._render_current()
+
+    def _move_relative(self, offset: int) -> None:
+        if self._state is None:
+            return
+        target_index = self._state.current_index + offset
+        if 0 <= target_index < len(self._state.situations):
+            self._go_to_situation(target_index)
 
     def _remember_current_selections(self) -> None:
         if self._state is None or self._checked:
@@ -1128,6 +1297,12 @@ class SessionPage(QWidget):
         self._is_finished = True
         self._timer.stop()
         self.player.stop()
+        self._remember_current_selections()
+        completed_ids = {result.situation_id for result in self._state.results}
+        for situation in self._state.situations:
+            selections = self._draft_selections.get(situation.id, {})
+            if situation.id not in completed_ids and selections:
+                self._state.submit_situation(situation, selections)
         final_score = self._state.finish(self.window().history_repository)
         correct = sum(result.correct_parts for result in self._state.results)
         total = len(self._state.situations) * 4
@@ -1163,10 +1338,20 @@ class SessionPage(QWidget):
         self.player.play()
 
     def _confirm_exit(self) -> None:
-        answer = QMessageBox.question(self, "Thoát phiên", "Bạn muốn thoát phiên hiện tại?")
+        answer = QMessageBox.question(
+            self,
+            "Thoát phiên",
+            "Tiến độ phiên học này sẽ không được lưu, bạn chắc chắn muốn thoát?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
         if answer == QMessageBox.StandardButton.Yes:
             self._timer.stop()
             self.player.stop()
+            if self._state is not None:
+                self.window().history_repository.discard_session(self._state.session_id)
+            self._state = None
+            self._draft_selections.clear()
             self.exit_requested.emit()
 
     def _clear_questions(self) -> None:
@@ -1218,26 +1403,52 @@ class HistoryDialog(QDialog):
     def __init__(self, history_repository: HistoryRepository, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Lịch sử ôn tập")
-        self.resize(780, 440)
+        self.resize(860, 440)
         layout = QVBoxLayout(self)
-        table = QTableWidget(0, 6)
-        table.setHorizontalHeaderLabels(
+        self.table = QTableWidget(0, 6)
+        self.table.setHorizontalHeaderLabels(
             ["Thời gian", "Chế độ", "Số câu", "Điểm", "Thang 10", "Trạng thái"]
         )
-        table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        self.table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        for column in (2, 3, 4, 5):
+            header.setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
         for row_index, row in enumerate(history_repository.recent_sessions()):
-            table.insertRow(row_index)
+            self.table.insertRow(row_index)
             values = [
-                row["started_at"],
+                self._format_timestamp(row["started_at"]),
                 "Tự luyện" if row["mode"] == "practice" else "Thi thử",
                 row["total_situations"],
-                "-" if row["score"] is None else row["score"],
-                "-" if row["score_on_ten"] is None else row["score_on_ten"],
+                self._format_score(row["score"]),
+                self._format_score(row["score_on_ten"]),
                 "Hoàn thành" if row["completed_at"] else "Chưa hoàn thành",
             ]
             for column, value in enumerate(values):
-                table.setItem(row_index, column, QTableWidgetItem(str(value)))
-        layout.addWidget(table)
+                self.table.setItem(row_index, column, QTableWidgetItem(str(value)))
+        self.table.setCurrentCell(-1, -1)
+        layout.addWidget(self.table)
+
+    @staticmethod
+    def _format_timestamp(value: object) -> str:
+        text = str(value)
+        try:
+            timestamp = datetime.fromisoformat(text)
+        except ValueError:
+            return text
+        return timestamp.strftime("%d/%m/%Y, %H:%M:%S")
+
+    @staticmethod
+    def _format_score(value: object | None) -> str:
+        if value is None:
+            return "-"
+        try:
+            return f"{float(value):.2f}".rstrip("0").rstrip(".")
+        except (TypeError, ValueError):
+            return str(value)
 
 
 class MainWindow(QMainWindow):
@@ -1277,7 +1488,7 @@ class MainWindow(QMainWindow):
         self.study_setup_page.home_requested.connect(self._show_home)
         self.official_exam_page.home_requested.connect(self._show_home)
         self.session_page.finished.connect(self._show_result)
-        self.session_page.exit_requested.connect(self._show_study_setup)
+        self.session_page.exit_requested.connect(self._show_home)
         self.result_page.setup_requested.connect(self._show_study_setup)
         self.result_page.home_requested.connect(self._show_home)
         self._show_home()

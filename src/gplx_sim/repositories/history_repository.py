@@ -93,6 +93,10 @@ class HistoryRepository:
                 ),
             )
 
+    def discard_session(self, session_id: int) -> None:
+        with closing(self._connect()) as connection, connection:
+            connection.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
+
     def recent_sessions(self, limit: int = 50) -> list[sqlite3.Row]:
         with closing(self._connect()) as connection:
             return connection.execute(

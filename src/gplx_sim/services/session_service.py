@@ -24,7 +24,14 @@ class SessionState:
         return self.current_index == len(self.situations) - 1
 
     def submit_current(self, selections: dict[int, int]) -> SituationResult:
-        result = grade_situation(self.current, selections)
+        return self.submit_situation(self.current, selections)
+
+    def submit_situation(
+        self,
+        situation: Situation,
+        selections: dict[int, int],
+    ) -> SituationResult:
+        result = grade_situation(situation, selections)
         self.results = [item for item in self.results if item.situation_id != result.situation_id]
         self.results.append(result)
         return result

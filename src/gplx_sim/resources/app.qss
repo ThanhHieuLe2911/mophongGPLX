@@ -241,33 +241,13 @@ QWidget#situationCheckHost {
 }
 
 QPushButton#situationCheckBox {
-    min-width: 26px;
-    max-width: 26px;
-    min-height: 26px;
-    max-height: 26px;
+    min-width: 16px;
+    max-width: 16px;
+    min-height: 16px;
+    max-height: 16px;
     padding: 0;
-    color: transparent;
-    background: #ffffff;
-    border: 2px solid #607d9b;
-    border-radius: 5px;
-    font-family: "Segoe UI Symbol", "Segoe UI";
-    font-size: 19px;
-    font-weight: 900;
-}
-
-QPushButton#situationCheckBox:hover {
-    background: #eaf4ff;
-    border-color: #1769aa;
-}
-
-QPushButton#situationCheckBox:checked {
-    color: #ffffff;
-    background: #1769aa;
-    border-color: #0f568f;
-}
-
-QPushButton#situationCheckBox:checked:hover {
-    background: #0f568f;
+    background: transparent;
+    border: none;
 }
 
 QHeaderView::section {
