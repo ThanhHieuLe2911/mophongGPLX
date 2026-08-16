@@ -12,6 +12,31 @@ class SessionMode(str, Enum):
 
 
 @dataclass(frozen=True, slots=True)
+class ChapterSummary:
+    id: int
+    code: str
+    name: str
+
+
+@dataclass(frozen=True, slots=True)
+class SituationSummary:
+    id: int
+    code: str
+    chapter_id: int
+    chapter_name: str
+    title: str
+    video_filename: str
+
+
+@dataclass(frozen=True, slots=True)
+class PracticeSetSummary:
+    id: int
+    code: str
+    name: str
+    situation_count: int
+
+
+@dataclass(frozen=True, slots=True)
 class Answer:
     id: int
     text: str

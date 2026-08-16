@@ -5,7 +5,8 @@
 ## Chức năng hiện có
 
 - Trang chủ gồm hai lựa chọn: **Ôn tập** và **Thi tốt nghiệp**.
-- **Tự luyện:** chọn ngẫu nhiên từ 1–20 tình huống, trả lời đủ 4 phần và nhận phản hồi đúng/sai ngay.
+- **Tự luyện:** chọn một trong ba nguồn nội dung: ngẫu nhiên 1–15 tình huống, bộ đề tối đa 10 tình huống do Admin chuẩn bị, hoặc tự chọn trong danh sách 120 tình huống theo chương/từ khóa.
+- Màn hình luyện tập hỗ trợ chuyển nhanh giữa các câu; câu đúng đủ 4 phần được đánh dấu xanh, câu sai ít nhất một phần được đánh dấu đỏ và đáp án nháp được giữ khi chuyển câu.
 - **Thi thử:** lấy ngẫu nhiên 10 tình huống, mặc định 15 phút, không lộ đáp án trong lúc làm và tự nộp khi hết giờ.
 - Catalog chuẩn có 6 chương, 120 tình huống, 480 phần câu hỏi và 1.920 phương án được trích từ `MP1.pdf`.
 - Mỗi phần câu hỏi luôn có đúng 4 phương án A–D và đúng một đáp án đúng.

@@ -42,6 +42,11 @@ class SessionState:
         self.current_index += 1
         return True
 
+    def move_to(self, index: int) -> None:
+        if not 0 <= index < len(self.situations):
+            raise IndexError("Vị trí tình huống nằm ngoài phiên làm bài")
+        self.current_index = index
+
     def finish(self, history: HistoryRepository) -> float:
         self.complete_unanswered()
         final_score = score_on_ten(self.results, len(self.situations))

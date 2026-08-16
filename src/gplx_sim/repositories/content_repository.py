@@ -4,7 +4,14 @@ import sqlite3
 from contextlib import closing
 from pathlib import Path
 
-from gplx_sim.domain.models import Answer, QuestionPart, Situation
+from gplx_sim.domain.models import (
+    Answer,
+    ChapterSummary,
+    PracticeSetSummary,
+    QuestionPart,
+    Situation,
+    SituationSummary,
+)
 
 
 class ContentRepository:
@@ -33,6 +40,104 @@ class ContentRepository:
                 (limit,),
             ).fetchall()
         return [self.get_situation(int(row["id"])) for row in rows]
+
+    def list_chapters(self) -> list[ChapterSummary]:
+        with closing(self._connect()) as connection:
+            rows = connection.execute(
+                "SELECT id, code, name FROM chapters ORDER BY id"
+            ).fetchall()
+        return [
+            ChapterSummary(id=int(row["id"]), code=str(row["code"]), name=str(row["name"]))
+            for row in rows
+        ]
+
+    def list_situations(self) -> list[SituationSummary]:
+        with closing(self._connect()) as connection:
+            rows = connection.execute(
+                """
+                SELECT
+                    s.id, s.code, s.chapter_id, c.name AS chapter_name,
+                    s.title, s.video_filename
+                FROM situations s
+                JOIN chapters c ON c.id = s.chapter_id
+                WHERE s.active = 1
+                ORDER BY s.id
+                """
+            ).fetchall()
+        return [
+            SituationSummary(
+                id=int(row["id"]),
+                code=str(row["code"]),
+                chapter_id=int(row["chapter_id"]),
+                chapter_name=str(row["chapter_name"]),
+                title=str(row["title"]),
+                video_filename=str(row["video_filename"]),
+            )
+            for row in rows
+        ]
+
+    def list_practice_sets(self) -> list[PracticeSetSummary]:
+        with closing(self._connect()) as connection:
+            rows = connection.execute(
+                """
+                SELECT ps.id, ps.code, ps.name, COUNT(psi.situation_id) AS situation_count
+                FROM practice_sets ps
+                JOIN practice_set_items psi ON psi.practice_set_id = ps.id
+                JOIN situations s ON s.id = psi.situation_id AND s.active = 1
+                WHERE ps.active = 1
+                GROUP BY ps.id, ps.code, ps.name
+                HAVING COUNT(psi.situation_id) BETWEEN 1 AND 10
+                ORDER BY ps.id
+                """
+            ).fetchall()
+        return [
+            PracticeSetSummary(
+                id=int(row["id"]),
+                code=str(row["code"]),
+                name=str(row["name"]),
+                situation_count=int(row["situation_count"]),
+            )
+            for row in rows
+        ]
+
+    def get_situations_by_ids(self, situation_ids: list[int]) -> list[Situation]:
+        ordered_ids = list(dict.fromkeys(int(identifier) for identifier in situation_ids))
+        if not ordered_ids:
+            return []
+        placeholders = ", ".join("?" for _ in ordered_ids)
+        with closing(self._connect()) as connection:
+            rows = connection.execute(
+                f"SELECT id FROM situations WHERE active = 1 AND id IN ({placeholders})",
+                ordered_ids,
+            ).fetchall()
+        available_ids = {int(row["id"]) for row in rows}
+        missing_ids = [identifier for identifier in ordered_ids if identifier not in available_ids]
+        if missing_ids:
+            raise LookupError(
+                "Không tìm thấy tình huống đang hoạt động: "
+                + ", ".join(str(identifier) for identifier in missing_ids)
+            )
+        return [self.get_situation(identifier) for identifier in ordered_ids]
+
+    def get_practice_set_situations(self, practice_set_id: int) -> list[Situation]:
+        with closing(self._connect()) as connection:
+            rows = connection.execute(
+                """
+                SELECT psi.situation_id
+                FROM practice_sets ps
+                JOIN practice_set_items psi ON psi.practice_set_id = ps.id
+                JOIN situations s ON s.id = psi.situation_id
+                WHERE ps.id = ? AND ps.active = 1 AND s.active = 1
+                ORDER BY psi.display_order
+                """,
+                (practice_set_id,),
+            ).fetchall()
+        situation_ids = [int(row["situation_id"]) for row in rows]
+        if not situation_ids:
+            raise LookupError("Bộ đề không tồn tại hoặc chưa có tình huống")
+        if len(situation_ids) > 10:
+            raise ValueError("Mỗi bộ đề chỉ được chứa tối đa 10 tình huống")
+        return self.get_situations_by_ids(situation_ids)
 
     def get_situation(self, situation_id: int) -> Situation:
         with closing(self._connect()) as connection:
