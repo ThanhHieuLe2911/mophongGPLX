@@ -39,19 +39,11 @@ def test_study_setup_sources_and_count_selector() -> None:
     with tempfile.TemporaryDirectory(prefix="gplx_ui_test_") as directory:
         page = StudySetupPage(_repository(directory))
 
-        assert page.question_count.value_box.maximum() == 15
-        page.question_count.value_box.setValue(10)
-        page.question_count.value_box.lineEdit().selectAll()
-        page.question_count.plus.click()
-        app.processEvents()
-        assert page.question_count.value() == 11
-        assert page.question_count.value_box.lineEdit().selectedText() == ""
-        page.question_count.value_box.setValue(15)
-        assert not page.question_count.plus.isEnabled()
+        assert page.random_source.radio.isChecked()
+        assert not hasattr(page, "question_count")
 
         page.set_source.radio.click()
         app.processEvents()
-        assert page.random_row.isHidden()
         assert not page.practice_set_row.isHidden()
         page.custom_source.radio.click()
         app.processEvents()
@@ -62,20 +54,9 @@ def test_study_setup_sources_and_count_selector() -> None:
         app.processEvents()
         assert page.source_container.isHidden()
         assert not page.duration_row.isHidden()
-        assert page.duration.minimum() == 10
-        assert page.duration.maximum() == 30
-        assert page.duration.value() == 15
-        assert page.duration.isReadOnly()
-        page.duration.lineEdit().selectAll()
-        page.duration_selector.plus.click()
-        assert page.duration.value() == 16
-        assert page.duration.lineEdit().selectedText() == ""
-        page.duration_selector.minus.click()
-        assert page.duration.value() == 15
-        page.duration.setValue(30)
-        assert not page.duration_selector.plus.isEnabled()
-        page.duration.setValue(10)
-        assert not page.duration_selector.minus.isEnabled()
+        assert page.duration == 10
+        assert page.duration_value_label.text() == "10 phút"
+        assert not hasattr(page, "duration_selector")
 
 
 def test_custom_situation_dialog_lists_filters_and_selects_120_items() -> None:

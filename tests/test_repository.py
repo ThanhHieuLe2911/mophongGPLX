@@ -84,6 +84,32 @@ class RepositoryTests(unittest.TestCase):
             self.assertEqual(practice_sets[0].situation_count, 3)
             self.assertEqual([situation.id for situation in situations], [7, 3, 12])
 
+    def test_get_exam_situations_respects_chapter_distribution(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="gplx_test_") as directory:
+            root = Path(directory)
+            paths = AppPaths(root, root / "content", root / "runtime")
+            initialize_databases(paths)
+            repository = ContentRepository(paths.content_database)
+
+            situations = repository.get_exam_situations()
+
+            self.assertEqual(len(situations), 10)
+            chapters = [situation.chapter for situation in situations]
+            expected_order = [
+                "Giao thông khi đi trong khu đô thị, khu dân cư đông đúc",
+                "Giao thông khi đi trong khu đô thị, khu dân cư đông đúc",
+                "Giao thông trên đường tối, đường gấp khúc, khúc cua",
+                "Giao thông khi lái xe trên đường cao tốc",
+                "Giao thông khi lái xe trên đường cao tốc",
+                "Giao thông trên đường đèo núi, lên dốc, xuống dốc hoặc khúc cua gấp",
+                "Giao thông trên quốc lộ, khu vực ngoại thành, giao cắt đường sắt hoặc người đi bộ",
+                "Giao thông trên quốc lộ, khu vực ngoại thành, giao cắt đường sắt hoặc người đi bộ",
+                "Các tình huống va chạm thực tế khi tham gia giao thông hỗn hợp",
+                "Các tình huống va chạm thực tế khi tham gia giao thông hỗn hợp",
+            ]
+            self.assertEqual(chapters, expected_order)
+            self.assertEqual(len({situation.id for situation in situations}), 10)
+
 
 if __name__ == "__main__":
     unittest.main()

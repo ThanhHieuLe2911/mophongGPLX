@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Mapping
 from contextlib import closing
 from pathlib import Path
 
 from gplx_sim.domain.models import (
+    EXAM_CHAPTER_DISTRIBUTION,
     Answer,
     ChapterSummary,
     PracticeSetSummary,
@@ -26,6 +28,10 @@ class ContentRepository:
         return int(row["total"])
 
     def get_random_situations(self, limit: int) -> list[Situation]:
+        """Bốc ngẫu nhiên không theo chương (giữ để tương thích).
+
+        Logic bốc đề có cấu trúc nằm ở ``get_exam_situations``.
+        """
         if limit < 1:
             return []
         with closing(self._connect()) as connection:
@@ -40,6 +46,50 @@ class ContentRepository:
                 (limit,),
             ).fetchall()
         return [self.get_situation(int(row["id"])) for row in rows]
+
+    def get_exam_situations(
+        self,
+        distribution: Mapping[int, int] | None = None,
+    ) -> list[Situation]:
+        """Bốc đề theo cấu trúc chương đã quy định.
+
+        Mặc định dùng ``EXAM_CHAPTER_DISTRIBUTION`` (2-1-2-1-2-2 = 10 câu).
+        Trong mỗi chương chọn ngẫu nhiên; thứ tự chương được giữ nguyên.
+        """
+        plan = dict(distribution or EXAM_CHAPTER_DISTRIBUTION)
+        if not plan:
+            return []
+        ordered_chapters = sorted(plan.items())
+        chapter_ids = [chapter_id for chapter_id, _ in ordered_chapters]
+        counts = [count for _, count in ordered_chapters]
+
+        with closing(self._connect()) as connection:
+            placeholders = ", ".join("?" for _ in chapter_ids)
+            rows = connection.execute(
+                f"""
+                SELECT id, chapter_id
+                FROM situations
+                WHERE active = 1 AND chapter_id IN ({placeholders})
+                ORDER BY chapter_id, RANDOM()
+                """,
+                chapter_ids,
+            ).fetchall()
+
+        grouped: dict[int, list[int]] = {chapter_id: [] for chapter_id in chapter_ids}
+        for row in rows:
+            grouped[int(row["chapter_id"])].append(int(row["id"]))
+
+        selected_ids: list[int] = []
+        for chapter_id, needed in ordered_chapters:
+            available = grouped.get(chapter_id, [])
+            if len(available) < needed:
+                raise LookupError(
+                    f"Chương {chapter_id} chỉ có {len(available)} tình huống, "
+                    f"cần {needed} để bốc đề."
+                )
+            selected_ids.extend(available[:needed])
+
+        return self.get_situations_by_ids(selected_ids)
 
     def list_chapters(self) -> list[ChapterSummary]:
         with closing(self._connect()) as connection:

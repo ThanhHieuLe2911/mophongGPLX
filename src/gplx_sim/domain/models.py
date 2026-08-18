@@ -11,6 +11,19 @@ class SessionMode(str, Enum):
     OFFICIAL_EXAM = "official_exam"
 
 
+# Cấu trúc đề thi cố định: mỗi chương lấy đúng số câu quy định.
+# Tổng cộng 10 câu, đúng thứ tự chương 1 -> 6.
+EXAM_CHAPTER_DISTRIBUTION: dict[int, int] = {
+    1: 2,
+    2: 1,
+    3: 2,
+    4: 1,
+    5: 2,
+    6: 2,
+}
+EXAM_TOTAL_SITUATIONS = sum(EXAM_CHAPTER_DISTRIBUTION.values())
+
+
 @dataclass(frozen=True, slots=True)
 class ChapterSummary:
     id: int
