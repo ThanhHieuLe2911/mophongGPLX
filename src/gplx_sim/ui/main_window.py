@@ -400,6 +400,16 @@ class SituationSelectionDialog(QDialog):
         self.use_selected.setEnabled(count > 0)
 
 
+class AnimatedStackedWidget(QStackedWidget):
+    """StackedWidget that switches pages without animation."""
+
+    def slide_to_index(self, index: int, direction: str = "left") -> None:
+        """Switch to page at index without animation."""
+        if index == self.currentIndex():
+            return
+        self.setCurrentIndex(index)
+
+
 class HomePage(QWidget):
     study_requested = Signal()
     official_exam_requested = Signal()
@@ -413,11 +423,7 @@ class HomePage(QWidget):
         heading = QLabel("MÔ PHỎNG TÌNH HUỐNG GIAO THÔNG")
         heading.setObjectName("heading")
         heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        subtitle = QLabel("Chọn chức năng để bắt đầu")
-        subtitle.setObjectName("subtitle")
-        subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(heading)
-        layout.addWidget(subtitle)
         layout.addSpacing(28)
 
         choices = QHBoxLayout()
@@ -425,8 +431,6 @@ class HomePage(QWidget):
         choices.addWidget(
             self._choice_card(
                 "ÔN TẬP",
-                "Tự luyện có phản hồi ngay hoặc thi thử có giới hạn thời gian.",
-                "Vào phần ôn tập",
                 self.study_requested.emit,
                 "studyCard",
             )
@@ -434,46 +438,41 @@ class HomePage(QWidget):
         choices.addWidget(
             self._choice_card(
                 "KIỂM TRA KẾT THÚC MÔN",
-                "Chọn khóa thi, kiểm tra thông tin thí sinh và thực hiện bài thi chính thức.",
-                "Vào phần thi",
                 self.official_exam_requested.emit,
                 "examCard",
             )
         )
         layout.addLayout(choices, 1)
-        note = QLabel("Dữ liệu câu hỏi và video được sử dụng trực tiếp trên máy này.")
-        note.setObjectName("mutedText")
-        note.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(note)
 
-    @staticmethod
-    def _choice_card(title: str, description: str, button_text: str, callback, object_name: str):
-        card = QFrame()
+    def _choice_card(self, title: str, callback, object_name: str):
+        card = _ClickableFrame()
         card.setObjectName(object_name)
+        card.setCursor(Qt.CursorShape.PointingHandCursor)
+        card.clicked.connect(callback)
         card_layout = QVBoxLayout(card)
         card_layout.setContentsMargins(38, 38, 38, 38)
         card_layout.setSpacing(18)
         title_label = QLabel(title)
         title_label.setObjectName("choiceTitle")
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        description_label = QLabel(description)
-        description_label.setObjectName("choiceDescription")
-        description_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        description_label.setWordWrap(True)
-        button = QPushButton(button_text)
-        button.setObjectName("primaryButton")
-        button.setMinimumHeight(54)
-        button.clicked.connect(callback)
         card_layout.addStretch()
         card_layout.addWidget(title_label)
-        card_layout.addWidget(description_label)
-        card_layout.addSpacing(18)
-        card_layout.addWidget(button)
         card_layout.addStretch()
         return card
 
 
+class _ClickableFrame(QFrame):
+    """A frame that can handle click events."""
+    clicked = Signal()
+
+    def mousePressEvent(self, event) -> None:
+        self.clicked.emit()
+        super().mousePressEvent(event)
+
+
 class StudySetupPage(QWidget):
+    """Single page for study setup with 3 mode options: Ngẫu nhiên, Tự chọn, Thi thử."""
+
     start_requested = Signal(str, str, object, int)
     history_requested = Signal()
     home_requested = Signal()
@@ -481,198 +480,200 @@ class StudySetupPage(QWidget):
     def __init__(self, content_repository: ContentRepository):
         super().__init__()
         self._repository = content_repository
-        self._situation_count = max(content_repository.count_situations(), 1)
         self._custom_situation_ids: set[int] = set()
-        layout = QVBoxLayout(self)
+
+        root_layout = QVBoxLayout(self)
+        root_layout.setContentsMargins(0, 0, 0, 0)
+        root_layout.setSpacing(0)
+
+        page = QWidget()
+        layout = QVBoxLayout(page)
         layout.setContentsMargins(64, 28, 64, 36)
         layout.setSpacing(16)
 
+        # Header
         top = QHBoxLayout()
         back = QPushButton("← Trang chủ")
+        back.setObjectName("ghostButton")
+        back.setMinimumHeight(36)
         back.clicked.connect(self.home_requested.emit)
-        history = QPushButton("Lịch sử ôn tập")
+        history = QPushButton("Lịch sử")
+        history.setObjectName("ghostButton")
+        history.setMinimumHeight(36)
         history.clicked.connect(self.history_requested.emit)
         top.addWidget(back)
         top.addStretch()
         top.addWidget(history)
         layout.addLayout(top)
 
+        # Title
         heading = QLabel("ÔN TẬP")
         heading.setObjectName("heading")
         heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        subtitle = QLabel("Mỗi phần câu hỏi luôn hiển thị đầy đủ 4 phương án A–D")
-        subtitle.setObjectName("subtitle")
-        subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(heading)
-        layout.addWidget(subtitle)
 
+        # Main card with 3 options
         card = QFrame()
         card.setObjectName("studySetupCard")
         card_layout = QVBoxLayout(card)
         card_layout.setContentsMargins(32, 26, 32, 26)
-        card_layout.setSpacing(16)
+        card_layout.setSpacing(18)
 
-        mode_row = QHBoxLayout()
-        mode_label = QLabel("Chế độ")
-        mode_label.setObjectName("fieldLabel")
-        self.mode = QComboBox()
-        self.mode.addItem("Tự luyện – phản hồi đáp án ngay", "practice")
-        self.mode.addItem("Thi thử – bấm giờ, không hiện đáp án", "mock_exam")
-        self.mode.currentIndexChanged.connect(self._sync_mode_controls)
-        mode_row.addWidget(mode_label)
-        mode_row.addWidget(self.mode, 1)
-        card_layout.addLayout(mode_row)
+        # Option group
+        self.option_group = QButtonGroup(self)
+        self.option_group.setExclusive(True)
 
-        self.content_title = QLabel("Nội dung")
-        self.content_title.setObjectName("fieldTitle")
-        card_layout.addWidget(self.content_title)
-
-        self.source_container = QWidget()
-        source_layout = QHBoxLayout(self.source_container)
-        source_layout.setContentsMargins(0, 0, 0, 0)
-        source_layout.setSpacing(12)
-        self.source_group = QButtonGroup(self)
-        self.source_group.setExclusive(True)
-        self.random_source = SourceOption(
+        # Option 1: Ngẫu nhiên
+        self.option_random = SourceOption(
             "Ngẫu nhiên",
-            "Luyện theo cấu trúc chuẩn của đề thi",
+            "10 tình huống theo cấu trúc chuẩn đề thi",
         )
-        self.set_source = SourceOption(
-            "Thi theo bộ đề",
-            "Tối đa 10 tình huống do Admin chuẩn bị",
+        self.option_group.addButton(self.option_random.radio, 0)
+
+        # Option 2: Tự chọn
+        self.option_custom = SourceOption("Tự chọn", "Lọc theo chương hoặc tìm kiếm")
+        self.option_group.addButton(self.option_custom.radio, 1)
+
+        # Option 3: Thi thử
+        self.option_exam = SourceOption("Thi thử", "Có giới hạn thời gian")
+        self.option_group.addButton(self.option_exam.radio, 2)
+
+        for option in (self.option_random, self.option_custom, self.option_exam):
+            card_layout.addWidget(option)
+
+        self.option_random.radio.toggled.connect(self._on_option_changed)
+        self.option_custom.radio.toggled.connect(self._on_option_changed)
+        self.option_exam.radio.toggled.connect(self._on_option_changed)
+
+        layout.addWidget(card)
+
+        # Dynamic content area
+        self.content_stack = QStackedWidget()
+        layout.addWidget(self.content_stack)
+
+        # Content 1: Practice info (for Ngẫu nhiên)
+        self.practice_content = self._create_practice_content()
+        self.content_stack.addWidget(self.practice_content)
+
+        # Content 2: Custom selection (for Tự chọn)
+        self.custom_content = self._create_custom_content()
+        self.content_stack.addWidget(self.custom_content)
+
+        # Content 3: Exam settings (for Thi thử)
+        self.exam_content = self._create_exam_content()
+        self.content_stack.addWidget(self.exam_content)
+
+        # Summary
+        self.summary = QLabel()
+        self.summary.setObjectName("summaryBox")
+        self.summary.setWordWrap(True)
+        layout.addWidget(self.summary)
+
+        # Start button
+        self.start_button = QPushButton("🚀 Bắt đầu tự luyện")
+        self.start_button.setObjectName("primaryButton")
+        self.start_button.setMinimumSize(280, 54)
+        self.start_button.clicked.connect(self._on_start_clicked)
+        layout.addWidget(self.start_button, alignment=Qt.AlignmentFlag.AlignHCenter)
+        layout.addStretch()
+
+        # Set default
+        self.option_random.radio.setChecked(True)
+        self._on_option_changed()
+
+        root_layout.addWidget(page)
+
+    def _create_practice_content(self) -> QWidget:
+        """Create practice mode content widget."""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(0, 8, 0, 0)
+        layout.setSpacing(8)
+        info = QLabel(
+            "Tự luyện 10 tình huống theo cấu trúc chuẩn đề thi và phản hồi "
+            "đúng/sai ngay sau mỗi tình huống."
         )
-        self.custom_source = SourceOption("Tự chọn", "Lọc theo chương hoặc tìm kiếm")
-        for identifier, option in enumerate(
-            (self.random_source, self.set_source, self.custom_source)
-        ):
-            self.source_group.addButton(option.radio, identifier)
-            option.radio.toggled.connect(self._sync_mode_controls)
-            source_layout.addWidget(option, 1)
-        card_layout.addWidget(self.source_container)
+        info.setObjectName("noticeBox")
+        info.setWordWrap(True)
+        layout.addWidget(info)
+        return widget
 
-        self.practice_set_row = QWidget()
-        set_layout = QHBoxLayout(self.practice_set_row)
-        set_layout.setContentsMargins(0, 0, 0, 0)
-        set_label = QLabel("Bộ đề")
-        set_label.setObjectName("fieldLabel")
-        self.practice_set = QComboBox()
-        self.practice_set.currentIndexChanged.connect(self._sync_mode_controls)
-        set_layout.addWidget(set_label)
-        set_layout.addWidget(self.practice_set, 1)
-        card_layout.addWidget(self.practice_set_row)
+    def _create_custom_content(self) -> QWidget:
+        """Create custom selection content widget."""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(0, 8, 0, 0)
+        layout.setSpacing(12)
 
-        self.custom_row = QWidget()
-        custom_layout = QHBoxLayout(self.custom_row)
-        custom_layout.setContentsMargins(0, 0, 0, 0)
-        custom_label = QLabel("Danh sách tình huống")
-        custom_label.setObjectName("fieldLabel")
+        row = QHBoxLayout()
+        row.setSpacing(12)
+        label = QLabel("Danh sách tình huống")
+        label.setObjectName("fieldLabel")
         self.custom_button = QPushButton("Mở danh sách 120 tình huống")
         self.custom_button.setObjectName("secondaryActionButton")
         self.custom_button.clicked.connect(self._choose_custom_situations)
         self.custom_count = QLabel("Chưa chọn tình huống")
         self.custom_count.setObjectName("mutedText")
-        custom_layout.addWidget(custom_label)
-        custom_layout.addWidget(self.custom_button)
-        custom_layout.addWidget(self.custom_count)
-        custom_layout.addStretch()
-        card_layout.addWidget(self.custom_row)
+        row.addWidget(label)
+        row.addWidget(self.custom_button)
+        row.addWidget(self.custom_count)
+        row.addStretch()
+        layout.addLayout(row)
 
-        self.duration = 10
-        self.duration_row = QWidget()
-        duration_layout = QHBoxLayout(self.duration_row)
-        duration_layout.setContentsMargins(0, 0, 0, 0)
-        duration_label = QLabel("Tổng thời gian")
-        duration_label.setObjectName("fieldLabel")
-        self.duration_value_label = QLabel("10 phút")
-        self.duration_value_label.setObjectName("fieldValue")
-        duration_layout.addWidget(duration_label)
-        duration_layout.addWidget(self.duration_value_label, 1)
-        duration_layout.addStretch()
-        card_layout.addWidget(self.duration_row)
-        layout.addWidget(card)
+        hint = QLabel(
+            "Có thể tìm kiếm, lọc theo chương và chọn bất kỳ tình huống nào để luyện tập."
+        )
+        hint.setObjectName("mutedText")
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
 
-        self.summary = QLabel()
-        self.summary.setObjectName("summaryBox")
-        self.summary.setMinimumHeight(62)
-        self.summary.setWordWrap(True)
-        layout.addWidget(self.summary)
-        self.start = QPushButton("Bắt đầu ôn tập")
-        self.start.setObjectName("primaryButton")
-        self.start.setMinimumSize(280, 54)
-        self.start.clicked.connect(self._emit_start)
-        layout.addWidget(self.start, alignment=Qt.AlignmentFlag.AlignHCenter)
-        layout.addStretch()
-        self.random_source.radio.setChecked(True)
-        self.refresh_content_options()
-        self._sync_mode_controls()
+        return widget
 
-    def refresh_content_options(self) -> None:
-        selected_set_id = self.practice_set.currentData()
-        self.practice_set.blockSignals(True)
-        self.practice_set.clear()
-        practice_sets = self._repository.list_practice_sets()
-        if practice_sets:
-            for practice_set in practice_sets:
-                self.practice_set.addItem(
-                    f"{practice_set.code} – {practice_set.name} "
-                    f"({practice_set.situation_count} tình huống)",
-                    practice_set.id,
-                )
-            matching_index = self.practice_set.findData(selected_set_id)
-            if matching_index >= 0:
-                self.practice_set.setCurrentIndex(matching_index)
-            self.practice_set.setEnabled(True)
+    def _create_exam_content(self) -> QWidget:
+        """Create exam mode content widget."""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(0, 8, 0, 0)
+        layout.setSpacing(8)
+
+        info = QLabel(
+            "Thi thử gồm 10 tình huống theo cấu trúc chuẩn đề thi GPLX.\n"
+            "Học viên sẽ có 10 phút làm bài. Không hiển thị đáp án trong lúc làm bài."
+        )
+        info.setObjectName("noticeBox")
+        info.setWordWrap(True)
+        layout.addWidget(info)
+
+        return widget
+
+    def _on_option_changed(self) -> None:
+        """Handle option radio button change."""
+        if self.option_random.radio.isChecked():
+            self.content_stack.setCurrentIndex(0)
+            self.summary.setText("10 tình huống · Cấu trúc chuẩn đề thi")
+            self.start_button.setText("Bắt đầu tự luyện")
+        elif self.option_custom.radio.isChecked():
+            self.content_stack.setCurrentIndex(1)
+            self._update_custom_summary()
         else:
-            self.practice_set.addItem("Chưa có bộ đề – hãy tạo trong phần Admin", None)
-            self.practice_set.setEnabled(False)
-        self.practice_set.blockSignals(False)
-        self._sync_mode_controls()
+            self.content_stack.setCurrentIndex(2)
+            self.summary.setText("10 tình huống · Cấu trúc chuẩn đề thi · 10 phút")
+            self.start_button.setText("Bắt đầu thi thử")
 
-    def _selected_source(self) -> str:
-        if self.set_source.radio.isChecked():
-            return "practice_set"
-        if self.custom_source.radio.isChecked():
-            return "custom"
-        return "random"
-
-    def _sync_mode_controls(self) -> None:
-        is_mock_exam = self.mode.currentData() == "mock_exam"
-        source = self._selected_source()
-        self.content_title.setVisible(not is_mock_exam)
-        self.source_container.setVisible(not is_mock_exam)
-        self.practice_set_row.setVisible(not is_mock_exam and source == "practice_set")
-        self.custom_row.setVisible(not is_mock_exam and source == "custom")
-        self.duration_row.setVisible(is_mock_exam)
-        if is_mock_exam:
-            self.summary.setText(
-                "Thi thử gồm 10 tình huống theo cấu trúc chuẩn đề thi, thời gian "
-                f"{self.duration} phút. Không hiển thị đáp án trong lúc làm bài."
-            )
-            self.start.setText("Bắt đầu thi thử")
-        elif source == "random":
-            self.summary.setText(
-                "Tự luyện 10 tình huống theo cấu trúc chuẩn đề thi và phản hồi "
-                "đúng/sai ngay sau mỗi tình huống."
-            )
-            self.start.setText("Bắt đầu tự luyện")
-        elif source == "practice_set":
-            if self.practice_set.currentData() is None:
-                self.summary.setText(
-                    "Chưa có bộ đề đang hoạt động. Admin cần tạo bộ đề gồm tối đa 10 tình huống."
-                )
-            else:
-                self.summary.setText(
-                    "Luyện theo bộ đề đã được Admin chuẩn bị; thứ tự tình huống được giữ nguyên."
-                )
-            self.start.setText("Bắt đầu theo bộ đề")
+    def _update_custom_summary(self) -> None:
+        """Update summary for custom selection."""
+        count = len(self._custom_situation_ids)
+        if count == 0:
+            self.summary.setText("Chọn các tình huống bạn muốn luyện tập.")
+            self.start_button.setText("Mở danh sách chọn tình huống")
+            self.start_button.setEnabled(False)
         else:
-            self.summary.setText(
-                f"Đã chọn {len(self._custom_situation_ids)} tình huống. Có thể tìm kiếm, "
-                "lọc theo chương và chọn bất kỳ tình huống nào cần luyện."
-            )
-            self.start.setText("Bắt đầu với danh sách đã chọn")
+            self.summary.setText(f"Đã chọn {count} tình huống để luyện tập.")
+            self.start_button.setText("Bắt đầu với danh sách đã chọn")
+            self.start_button.setEnabled(True)
 
     def _choose_custom_situations(self) -> None:
+        """Open situation selection dialog."""
         dialog = SituationSelectionDialog(
             self._repository,
             self._custom_situation_ids,
@@ -684,31 +685,13 @@ class StudySetupPage(QWidget):
         count = len(self._custom_situation_ids)
         self.custom_count.setText(f"Đã chọn {count}/120")
         self.custom_button.setText("Thay đổi danh sách")
-        self._sync_mode_controls()
+        self._update_custom_summary()
 
-    def _emit_start(self) -> None:
-        mode = str(self.mode.currentData())
-        if mode == "mock_exam":
-            self.start_requested.emit(
-                mode,
-                "exam",
-                None,
-                self.duration * 60,
-            )
-            return
-
-        source = self._selected_source()
-        if source == "practice_set":
-            practice_set_id = self.practice_set.currentData()
-            if practice_set_id is None:
-                QMessageBox.information(
-                    self,
-                    "Chưa có bộ đề",
-                    "Admin chưa tạo bộ đề đang hoạt động.",
-                )
-                return
-            selection: object = int(practice_set_id)
-        elif source == "custom":
+    def _on_start_clicked(self) -> None:
+        """Handle start button click."""
+        if self.option_random.radio.isChecked():
+            self.start_requested.emit("practice", "random", None, 0)
+        elif self.option_custom.radio.isChecked():
             if not self._custom_situation_ids:
                 QMessageBox.information(
                     self,
@@ -717,9 +700,10 @@ class StudySetupPage(QWidget):
                 )
                 return
             selection = sorted(self._custom_situation_ids)
+            self.start_requested.emit("practice", "custom", selection, 0)
         else:
-            selection = None
-        self.start_requested.emit(mode, source, selection, 0)
+            duration = 10 * 60  # 10 minutes fixed
+            self.start_requested.emit("mock_exam", "exam", None, duration)
 
 
 class OfficialExamPage(QWidget):
@@ -806,6 +790,7 @@ class SessionPage(QWidget):
         self._videos_directory = videos_directory
         self._state: SessionState | None = None
         self._groups: dict[int, QButtonGroup] = {}
+        self._part_boxes: dict[int, QGroupBox] = {}
         self._answer_options: dict[int, AnswerOption] = {}
         self._quick_buttons: list[QPushButton] = []
         self._draft_selections: dict[int, dict[int, int]] = {}
@@ -951,6 +936,7 @@ class SessionPage(QWidget):
             box_layout = QVBoxLayout(box)
             group = QButtonGroup(box)
             group.setExclusive(True)
+            self._part_boxes[part.id] = box
             self._groups[part.id] = group
             for answer_index, answer in enumerate(part.answers):
                 label = chr(ord("A") + answer_index)
@@ -1067,16 +1053,42 @@ class SessionPage(QWidget):
     def _answer_selection_changed(self) -> None:
         if self._state is None:
             return
-        if not self._checked or self._state.mode == "practice":
-            pass
-        elif self._result_for_situation(self._state.current.id) is not None:
-            return
         selections = self._selected_answers()
+        previous = self._draft_selections.get(self._state.current.id, {})
+        newly_selected_part = next(
+            (
+                part_id
+                for part_id in self._groups
+                if part_id in selections
+                and previous.get(part_id) != selections[part_id]
+            ),
+            None,
+        )
         if selections:
             self._draft_selections[self._state.current.id] = selections
         else:
             self._draft_selections.pop(self._state.current.id, None)
         self._update_action_controls()
+        if newly_selected_part is not None:
+            QTimer.singleShot(0, lambda: self._scroll_to_next_part(newly_selected_part))
+
+    def _scroll_to_next_part(self, current_part_id: int) -> None:
+        if self._state is None:
+            return
+        part_ids = [part.id for part in self._state.current.parts]
+        if current_part_id not in part_ids:
+            return
+        next_index = part_ids.index(current_part_id) + 1
+        if next_index >= len(part_ids):
+            return
+        next_box = self._part_boxes.get(part_ids[next_index])
+        if next_box is None:
+            return
+        bar = self.scroll.verticalScrollBar()
+        target = max(0, next_box.pos().y())
+        if target > bar.maximum():
+            target = bar.maximum()
+        bar.setValue(target)
 
     def _update_action_controls(self) -> None:
         if self._state is None:
@@ -1362,6 +1374,7 @@ class SessionPage(QWidget):
 
     def _clear_questions(self) -> None:
         self._groups.clear()
+        self._part_boxes.clear()
         self._answer_options.clear()
         while self.questions_layout.count():
             item = self.questions_layout.takeAt(0)
@@ -1471,33 +1484,51 @@ class MainWindow(QMainWindow):
         self.resize(1366, 820)
         self.setMinimumSize(1100, 720)
 
-        self.stack = QStackedWidget()
+        self.stack = AnimatedStackedWidget()
         self.setCentralWidget(self.stack)
         self.home_page = HomePage()
         self.study_setup_page = StudySetupPage(content_repository)
         self.official_exam_page = OfficialExamPage()
         self.session_page = SessionPage(videos_directory)
         self.result_page = ResultPage()
-        for page in (
-            self.home_page,
-            self.study_setup_page,
-            self.official_exam_page,
-            self.session_page,
-            self.result_page,
-        ):
-            self.stack.addWidget(page)
 
-        self.home_page.study_requested.connect(self._show_study_setup)
-        self.home_page.official_exam_requested.connect(self._show_official_exam)
+        # Stack order: 0=Home, 1=StudySetup, 2=OfficialExam, 3=Session, 4=Result
+        self.stack.addWidget(self.home_page)
+        self.stack.addWidget(self.study_setup_page)
+        self.stack.addWidget(self.official_exam_page)
+        self.stack.addWidget(self.session_page)
+        self.stack.addWidget(self.result_page)
+
+        # HomePage signals
+        self.home_page.study_requested.connect(self._on_study_requested)
+        self.home_page.official_exam_requested.connect(self._on_official_exam_requested)
+
+        # StudySetupPage signals
         self.study_setup_page.start_requested.connect(self._start_study_session)
         self.study_setup_page.history_requested.connect(self._show_history)
-        self.study_setup_page.home_requested.connect(self._show_home)
-        self.official_exam_page.home_requested.connect(self._show_home)
+        self.study_setup_page.home_requested.connect(self._on_home_requested)
+
+        # OfficialExamPage signals
+        self.official_exam_page.home_requested.connect(self._on_home_requested)
+
+        # SessionPage signals
         self.session_page.finished.connect(self._show_result)
-        self.session_page.exit_requested.connect(self._show_home)
-        self.result_page.setup_requested.connect(self._show_study_setup)
-        self.result_page.home_requested.connect(self._show_home)
+        self.session_page.exit_requested.connect(self._on_home_requested)
+
+        # ResultPage signals
+        self.result_page.setup_requested.connect(self._on_study_requested)
+        self.result_page.home_requested.connect(self._on_home_requested)
+
         self._show_home()
+
+    def _on_study_requested(self) -> None:
+        self.stack.slide_to_index(1, "left")
+
+    def _on_official_exam_requested(self) -> None:
+        self.stack.slide_to_index(2, "left")
+
+    def _on_home_requested(self) -> None:
+        self.stack.slide_to_index(0, "right")
 
     def _start_study_session(
         self,
@@ -1507,9 +1538,7 @@ class MainWindow(QMainWindow):
         duration_seconds: int,
     ) -> None:
         try:
-            if source == "practice_set":
-                situations = self.content_repository.get_practice_set_situations(int(selection))
-            elif source == "custom":
+            if source == "custom":
                 situations = self.content_repository.get_situations_by_ids(
                     [int(identifier) for identifier in selection]
                 )
@@ -1528,23 +1557,16 @@ class MainWindow(QMainWindow):
             SessionState(session_id=session_id, mode=mode, situations=situations),
             duration_seconds,
         )
-        self.stack.setCurrentWidget(self.session_page)
+        self.stack.slide_to_index(3, "left")
 
     def _show_result(
         self, score: float, correct: int, total: int, mode: str, reason: str
     ) -> None:
         self.result_page.show_result(score, correct, total, mode, reason)
-        self.stack.setCurrentWidget(self.result_page)
+        self.stack.slide_to_index(4, "left")
 
     def _show_history(self) -> None:
         HistoryDialog(self.history_repository, self).exec()
 
     def _show_home(self) -> None:
-        self.stack.setCurrentWidget(self.home_page)
-
-    def _show_study_setup(self) -> None:
-        self.study_setup_page.refresh_content_options()
-        self.stack.setCurrentWidget(self.study_setup_page)
-
-    def _show_official_exam(self) -> None:
-        self.stack.setCurrentWidget(self.official_exam_page)
+        self.stack.setCurrentIndex(0)

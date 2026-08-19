@@ -65,13 +65,6 @@ def validate_catalog(catalog: dict) -> None:
     if chapter_counts != EXPECTED_CHAPTER_COUNTS:
         raise ValueError(f"Số tình huống theo chương không đúng: {chapter_counts}")
 
-    for practice_set in catalog.get("practice_sets", []):
-        situation_ids = practice_set.get("situation_ids", [])
-        if not 1 <= len(situation_ids) <= 10:
-            raise ValueError(f"Bộ đề {practice_set['code']} phải có từ 1 đến 10 tình huống")
-        if len(set(situation_ids)) != len(situation_ids):
-            raise ValueError(f"Bộ đề {practice_set['code']} có tình huống bị trùng")
-
 
 def catalog_checksum(catalog: dict) -> str:
     canonical = json.dumps(catalog, ensure_ascii=False, sort_keys=True).encode("utf-8")
@@ -156,30 +149,6 @@ def build_content_database(destination: Path, catalog: dict | None = None) -> No
                         )
                         answer_id += 1
                     part_id += 1
-
-            for practice_set in catalog.get("practice_sets", []):
-                connection.execute(
-                    "INSERT INTO practice_sets(id, code, name, active) VALUES (?, ?, ?, ?)",
-                    (
-                        practice_set["id"],
-                        practice_set["code"],
-                        practice_set["name"],
-                        int(practice_set.get("active", True)),
-                    ),
-                )
-                connection.executemany(
-                    """
-                    INSERT INTO practice_set_items(
-                        practice_set_id, situation_id, display_order
-                    ) VALUES (?, ?, ?)
-                    """,
-                    [
-                        (practice_set["id"], situation_id, order)
-                        for order, situation_id in enumerate(
-                            practice_set["situation_ids"], start=1
-                        )
-                    ],
-                )
 
             connection.execute("ANALYZE")
             connection.execute("PRAGMA optimize")

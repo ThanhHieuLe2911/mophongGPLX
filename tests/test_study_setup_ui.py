@@ -39,24 +39,26 @@ def test_study_setup_sources_and_count_selector() -> None:
     with tempfile.TemporaryDirectory(prefix="gplx_ui_test_") as directory:
         page = StudySetupPage(_repository(directory))
 
-        assert page.random_source.radio.isChecked()
-        assert not hasattr(page, "question_count")
+        # Test that study_setup_page.stack has 3 pages (mode select, practice, exam)
+        assert page.stack.count() == 3
 
-        page.set_source.radio.click()
-        app.processEvents()
-        assert not page.practice_set_row.isHidden()
-        page.custom_source.radio.click()
-        app.processEvents()
-        assert page.practice_set_row.isHidden()
-        assert not page.custom_row.isHidden()
+        # Test mode cards exist
+        assert hasattr(page, 'practice_card')
+        assert hasattr(page, 'exam_card')
+        assert page.practice_card.mode == "practice"
+        assert page.exam_card.mode == "mock_exam"
 
-        page.mode.setCurrentIndex(1)
-        app.processEvents()
-        assert page.source_container.isHidden()
-        assert not page.duration_row.isHidden()
-        assert page.duration == 10
-        assert page.duration_value_label.text() == "10 phút"
-        assert not hasattr(page, "duration_selector")
+        # Test practice setup controls exist
+        assert hasattr(page, 'practice_start')
+        assert hasattr(page, 'practice_summary')
+        assert hasattr(page, 'random_source')
+        assert hasattr(page, 'practice_custom_source')
+
+        # Test exam setup controls exist
+        assert hasattr(page, 'exam_start')
+        assert hasattr(page, 'exam_summary')
+        assert hasattr(page, 'exam_duration_slider')
+        assert page.exam_duration_slider.value() == 10
 
 
 def test_custom_situation_dialog_lists_filters_and_selects_120_items() -> None:

@@ -32,7 +32,7 @@ def main() -> int:
         HistoryRepository(paths.history_database),
         paths.videos_directory,
     )
-    window.show()
+    window.showMaximized()
     return application.exec()
 
 

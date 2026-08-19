@@ -42,14 +42,6 @@ class SituationSummary:
 
 
 @dataclass(frozen=True, slots=True)
-class PracticeSetSummary:
-    id: int
-    code: str
-    name: str
-    situation_count: int
-
-
-@dataclass(frozen=True, slots=True)
 class Answer:
     id: int
     text: str

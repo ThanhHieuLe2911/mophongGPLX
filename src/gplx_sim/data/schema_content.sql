@@ -36,17 +36,3 @@ CREATE TABLE IF NOT EXISTS answers (
     is_correct INTEGER NOT NULL DEFAULT 0 CHECK (is_correct IN (0, 1)),
     display_order INTEGER NOT NULL
 );
-
-CREATE TABLE IF NOT EXISTS practice_sets (
-    id INTEGER PRIMARY KEY,
-    code TEXT NOT NULL UNIQUE,
-    name TEXT NOT NULL,
-    active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1))
-);
-
-CREATE TABLE IF NOT EXISTS practice_set_items (
-    practice_set_id INTEGER NOT NULL REFERENCES practice_sets(id) ON DELETE CASCADE,
-    situation_id INTEGER NOT NULL REFERENCES situations(id),
-    display_order INTEGER NOT NULL,
-    PRIMARY KEY (practice_set_id, situation_id)
-);

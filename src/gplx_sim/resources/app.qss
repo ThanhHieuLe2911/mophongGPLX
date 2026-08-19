@@ -29,7 +29,7 @@ QLabel#score {
 }
 
 QLabel#choiceTitle {
-    font-size: 29px;
+    font-size: 36px;
     font-weight: 800;
     color: #123a67;
 }
@@ -69,9 +69,15 @@ QLabel#timerLabel {
 }
 
 QFrame#card, QFrame#studySetupCard, QFrame#studyCard, QFrame#examCard, QGroupBox {
-    background: white;
+    background: #f3f6fa;
     border: 1px solid #dce4ed;
     border-radius: 10px;
+}
+
+QFrame#loginCard {
+    background: #f3f6fa;
+    border: 1px solid #dce4ed;
+    border-radius: 14px;
 }
 
 QFrame#studySetupCard QLabel,
@@ -439,4 +445,228 @@ QLabel#videoTimeLabel {
     min-width: 108px;
     color: #52677c;
     font-size: 15px;
+}
+
+/* ---------- Admin shell ---------- */
+
+QWidget#adminRoot {
+    background: #f3f6fa;
+}
+
+QFrame#sidebar {
+    background: #11243a;
+    border: none;
+    border-right: 1px solid #0a1828;
+}
+
+QFrame#sidebarHeader {
+    background: #0a1828;
+    border: 1px solid #1b3553;
+    border-radius: 8px;
+}
+
+QLabel#sidebarTitle {
+    color: #ffffff;
+    font-size: 17px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    background: transparent;
+}
+
+QLabel#sidebarSectionLabel {
+    color: #8aa6c4;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    background: transparent;
+}
+
+QListWidget#sidebarMenu {
+    background: transparent;
+    border: none;
+    color: #d8e3ef;
+    outline: none;
+    padding: 0;
+}
+
+QListWidget#sidebarMenu::item {
+    padding: 10px 14px;
+    margin: 2px 0;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    color: #d8e3ef;
+    background: transparent;
+    font-weight: 600;
+}
+
+QListWidget#sidebarMenu::item:hover {
+    background: #1a3553;
+    border-color: #2a4d72;
+    color: #ffffff;
+}
+
+QListWidget#sidebarMenu::item:selected {
+    background: #1769aa;
+    border-color: #2476bb;
+    color: #ffffff;
+}
+
+QPushButton#sidebarLogout {
+    background: #1a3553;
+    border: 1px solid #2a4d72;
+    color: #d8e3ef;
+    border-radius: 7px;
+}
+
+QPushButton#sidebarLogout:hover {
+    background: #2a4d72;
+    color: #ffffff;
+}
+
+QStackedWidget#adminContent {
+    background: #f3f6fa;
+    border: none;
+}
+
+/* ---------- Login card ---------- */
+
+QFrame#loginCard {
+    background: white;
+    border: 1px solid #dce4ed;
+    border-radius: 14px;
+}
+
+QLabel#loginIcon {
+    font-size: 52px;
+    background: transparent;
+    color: #1769aa;
+}
+
+QLabel#fieldLabel {
+    color: #243b53;
+    font-size: 17px;
+    font-weight: 700;
+    background: transparent;
+    padding: 0;
+}
+
+QLineEdit#loginInput {
+    min-height: 44px;
+    padding: 0 14px;
+    background: #f3f6fa;
+    border: 1px solid #becbd9;
+    border-radius: 8px;
+    font-size: 16px;
+}
+
+QLineEdit#loginInput:focus {
+    background: #f3f6fa;
+    border: 2px solid #3686c9;
+}
+
+QFrame#loginCard {
+    background: #f3f6fa;
+}
+
+QFrame#loginCard QLabel,
+QFrame#loginCard QLineEdit {
+    background: #f3f6fa;
+}
+
+QPushButton#ghostButton {
+    background: transparent;
+    border: 1px solid #b8c5d2;
+    color: #243b53;
+}
+
+QPushButton#ghostButton:hover {
+    background: #eef3f8;
+}
+
+QLabel#errorText {
+    color: #c92a2a;
+    font-size: 14px;
+    font-weight: 600;
+    background: #f3f6fa;
+    border: 1px solid #f3b8b8;
+    border-radius: 6px;
+    padding: 8px 10px;
+}
+
+/* ---------- Mode Cards ---------- */
+
+QFrame#modeCard {
+    background: white;
+    border: 2px solid #dce4ed;
+    border-radius: 14px;
+}
+
+QFrame#modeCard:hover {
+    border-color: #86b8e4;
+    background: #f8fbff;
+}
+
+QFrame#modeCard[selected="true"] {
+    border-color: #1769aa;
+    background: #eaf4ff;
+}
+
+QLabel#modeIcon {
+    font-size: 42px;
+    background: transparent;
+}
+
+QLabel#modeTitle {
+    font-size: 22px;
+    font-weight: 800;
+    color: #123a67;
+    background: transparent;
+}
+
+QLabel#modeDescription {
+    color: #607080;
+    font-size: 15px;
+    background: transparent;
+}
+
+/* ---------- Duration Slider ---------- */
+
+QSlider#durationSlider {
+    min-height: 40px;
+}
+
+QSlider#durationSlider::groove:horizontal {
+    height: 8px;
+    background: #d2dce6;
+    border-radius: 4px;
+}
+
+QSlider#durationSlider::sub-page:horizontal {
+    background: #1769aa;
+    border-radius: 4px;
+}
+
+QSlider#durationSlider::handle:horizontal {
+    width: 24px;
+    height: 24px;
+    margin: -8px 0;
+    background: #1769aa;
+    border: 3px solid white;
+    border-radius: 12px;
+}
+
+QSlider#durationSlider::handle:horizontal:hover {
+    background: #0f568f;
+}
+
+QSlider#durationSlider::add-page:horizontal {
+    background: #d2dce6;
+    border-radius: 4px;
+}
+
+QLabel#durationValue {
+    font-size: 28px;
+    font-weight: 800;
+    color: #1769aa;
+    background: transparent;
 }

@@ -16,6 +16,6 @@ content/*.db
 *.mov
 *.exe
 *.zip
-*.sql
+/tss.sql
 *.pdf
 /project.md
