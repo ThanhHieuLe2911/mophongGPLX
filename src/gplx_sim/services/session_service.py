@@ -54,13 +54,16 @@ class SessionState:
             raise IndexError("Vị trí tình huống nằm ngoài phiên làm bài")
         self.current_index = index
 
-    def finish(self, history: HistoryRepository) -> float:
+    def finish(self, history: HistoryRepository, save_history: bool = True) -> float:
         self.complete_unanswered()
         final_score = score_on_ten(self.results, len(self.situations))
-        history.complete_session(
-            self.session_id,
-            self.situations,
-            self.results,
-            final_score,
-        )
+        if save_history:
+            history.complete_session(
+                self.session_id,
+                self.situations,
+                self.results,
+                final_score,
+            )
+        else:
+            history.discard_session(self.session_id)
         return final_score

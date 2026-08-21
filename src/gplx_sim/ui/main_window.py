@@ -95,6 +95,15 @@ class AnswerOption(QFrame):
             f"QLabel#answerText {{ color: {color}; font-weight: 700; background: transparent; }}"
         )
 
+    def reset(self) -> None:
+        self.radio.setAutoExclusive(False)
+        self.radio.setChecked(False)
+        self.radio.setAutoExclusive(True)
+        self.setProperty("selected", False)
+        self.style().unpolish(self)
+        self.style().polish(self)
+        self.setStyleSheet("")
+
 
 class SourceOption(QFrame):
     def __init__(self, title: str, description: str):
@@ -1252,7 +1261,11 @@ class ExamSessionPage(QWidget):
             selections = self._draft_selections.get(situation.id, {})
             if situation.id not in completed_ids and selections:
                 self._state.submit_situation(situation, selections)
-        final_score = self._state.finish(self.window().history_repository)
+        
+        final_score = self._state.finish(
+            self.window().history_repository, 
+            save_history=self._state.mode != "practice"
+        )
         correct = sum(result.correct_parts for result in self._state.results)
         total = len(self._state.situations) * 4
         self.finished.emit(final_score, correct, total, self._state.mode, reason)
@@ -1290,7 +1303,7 @@ class ExamSessionPage(QWidget):
         answer = QMessageBox.question(
             self,
             "Thoát phiên",
-            "Tiến độ phiên học này sẽ không được lưu, bạn chắc chắn muốn thoát?",
+            "Bạn có chắc chắn muốn thoát không?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
@@ -1733,6 +1746,7 @@ class PracticeSessionPage(QWidget):
     def _on_reset(self) -> None:
         self._checked = False
         self._draft_selections.pop(self._state.current.id, None)
+        self._state.results = [r for r in self._state.results if r.situation_id != self._state.current.id]
         for group in self._groups.values():
             group.setExclusive(False)
             for btn in group.buttons():
@@ -1893,12 +1907,14 @@ class PracticeSessionPage(QWidget):
         answer = QMessageBox.question(
             self,
             "Thoát phiên",
-            "Tiến độ phiên học này sẽ không được lưu, bạn chắc chắn muốn thoát?",
+            "Bạn có chắc chắn muốn thoát không?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
         if answer == QMessageBox.StandardButton.Yes:
             self.player.stop()
+            if self._state is not None:
+                self.window().history_repository.discard_session(self._state.session_id)
             self._state = None
             self._draft_selections.clear()
             self.exit_requested.emit()
@@ -2036,7 +2052,7 @@ class MainWindow(QMainWindow):
         self.official_exam_page.home_requested.connect(self._on_home_requested)
 
         # PracticeSessionPage signals
-        self.practice_session_page.exit_requested.connect(self._on_home_requested)
+        self.practice_session_page.exit_requested.connect(self._on_practice_exit)
 
         # ExamSessionPage signals
         self.exam_session_page.finished.connect(self._show_result)
@@ -2100,6 +2116,12 @@ class MainWindow(QMainWindow):
 
     def _show_history(self) -> None:
         HistoryDialog(self.history_repository, self).exec()
+
+    def _on_practice_exit(self) -> None:
+        state = self.practice_session_page._state
+        if state and state.session_id:
+            self.history_repository.discard_session(state.session_id)
+        self._on_home_requested()
 
     def _show_home(self) -> None:
         self.stack.setCurrentIndex(0)
