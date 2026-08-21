@@ -117,7 +117,7 @@ class SourceOption(QFrame):
         description_label.setWordWrap(True)
         for label in (title_label, description_label):
             label.setCursor(Qt.CursorShape.PointingHandCursor)
-            label.clicked.connect(self.radio.click)
+            label.clicked.connect(lambda: self.radio.setChecked(True))
         labels.addWidget(title_label)
         labels.addWidget(description_label)
         layout.addWidget(self.radio, alignment=Qt.AlignmentFlag.AlignTop)
@@ -131,7 +131,7 @@ class SourceOption(QFrame):
 
     def mousePressEvent(self, event) -> None:
         if self.isEnabled():
-            self.radio.click()
+            self.radio.setChecked(True)
         super().mousePressEvent(event)
 
 
@@ -481,6 +481,9 @@ class StudySetupPage(QWidget):
         super().__init__()
         self._repository = content_repository
         self._custom_situation_ids: set[int] = set()
+        self._option_random: OptionItem
+        self._option_custom: OptionItem
+        self._option_exam: OptionItem
 
         root_layout = QVBoxLayout(self)
         root_layout.setContentsMargins(0, 0, 0, 0)
@@ -583,6 +586,14 @@ class StudySetupPage(QWidget):
 
         root_layout.addWidget(page)
 
+    def showEvent(self, event) -> None:
+        """Reset to default state when page is shown."""
+        self.option_random.radio.setChecked(True)
+        self._on_option_changed()
+        self._custom_situation_ids.clear()
+        self.custom_count.setText("Chưa chọn tình huống")
+        super().showEvent(event)
+
     def _create_practice_content(self) -> QWidget:
         """Create practice mode content widget."""
         widget = QWidget()
@@ -648,6 +659,7 @@ class StudySetupPage(QWidget):
 
     def _on_option_changed(self) -> None:
         """Handle option radio button change."""
+        self.start_button.setEnabled(True)
         if self.option_random.radio.isChecked():
             self.content_stack.setCurrentIndex(0)
             self.summary.setText("10 tình huống · Cấu trúc chuẩn đề thi")
@@ -1254,6 +1266,12 @@ class SessionPage(QWidget):
         self._remember_current_selections()
         self._state.move_to(index)
         self._render_current()
+        QTimer.singleShot(0, lambda: self._scroll_to_top())
+
+    def _scroll_to_top(self) -> None:
+        """Scroll the questions area back to the top."""
+        bar = self.scroll.verticalScrollBar()
+        bar.setValue(0)
 
     def _move_relative(self, offset: int) -> None:
         if self._state is None:
