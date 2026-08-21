@@ -26,6 +26,14 @@ class ContentRepository:
             ).fetchone()
         return int(row["total"])
 
+    def get_all_situations(self) -> list[Situation]:
+        """Lấy tất cả các tình huống đang hoạt động, sắp xếp theo ID."""
+        with closing(self._connect()) as connection:
+            rows = connection.execute(
+                "SELECT id FROM situations WHERE active = 1 ORDER BY id"
+            ).fetchall()
+        return [self.get_situation(int(row["id"])) for row in rows]
+
     def get_random_situations(self, limit: int) -> list[Situation]:
         """Bốc ngẫu nhiên không theo chương (giữ để tương thích).
 
@@ -148,7 +156,7 @@ class ContentRepository:
         with closing(self._connect()) as connection:
             situation_row = connection.execute(
                 """
-                SELECT s.id, s.code, s.title, s.video_filename, c.name AS chapter
+                SELECT s.id, s.code, s.title, s.chapter_id, s.video_filename, c.name AS chapter
                 FROM situations s
                 JOIN chapters c ON c.id = s.chapter_id
                 WHERE s.id = ?
@@ -194,6 +202,7 @@ class ContentRepository:
             code=str(situation_row["code"]),
             title=str(situation_row["title"]),
             chapter=str(situation_row["chapter"]),
+            chapter_id=int(situation_row["chapter_id"]),
             video_filename=str(situation_row["video_filename"]),
             parts=tuple(parts),
         )

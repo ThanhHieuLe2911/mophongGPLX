@@ -62,6 +62,7 @@ class Situation:
     code: str
     title: str
     chapter: str
+    chapter_id: int
     video_filename: str
     parts: tuple[QuestionPart, ...]
 
