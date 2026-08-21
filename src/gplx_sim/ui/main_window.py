@@ -1009,7 +1009,7 @@ class ExamSessionPage(QWidget):
             target = bar.maximum()
 
         self._scroll_animation = QPropertyAnimation(bar, b"value")
-        self._scroll_animation.setDuration(300)
+        self._scroll_animation.setDuration(500)
         self._scroll_animation.setStartValue(bar.value())
         self._scroll_animation.setEndValue(target)
         self._scroll_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
@@ -1806,7 +1806,7 @@ class PracticeSessionPage(QWidget):
             target = bar.maximum()
 
         self._scroll_animation = QPropertyAnimation(bar, b"value")
-        self._scroll_animation.setDuration(300)
+        self._scroll_animation.setDuration(500)
         self._scroll_animation.setStartValue(bar.value())
         self._scroll_animation.setEndValue(target)
         self._scroll_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
