@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QButtonGroup,
     QComboBox,
     QDialog,
+    QDialogButtonBox,
     QFormLayout,
     QFrame,
     QGroupBox,
@@ -22,6 +23,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMainWindow,
     QMessageBox,
+    QProgressBar,
     QPushButton,
     QRadioButton,
     QScrollArea,
@@ -39,6 +41,57 @@ from gplx_sim.domain.models import Situation, SituationResult
 from gplx_sim.repositories.content_repository import ContentRepository
 from gplx_sim.repositories.history_repository import HistoryRepository
 from gplx_sim.services.session_service import SessionState
+
+
+class TimeUpDialog(QDialog):
+    """Dialog shown when time is up, with a 5-second countdown."""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Hết thời gian")
+        self.setModal(True)
+        self.setFixedSize(400, 180)
+        
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+        
+        self.message_label = QLabel("Đã hết thời gian làm bài!")
+        self.message_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #c92a2a;")
+        self.message_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        self.sub_label = QLabel("Hệ thống đang tiến hành chấm điểm...")
+        self.sub_label.setStyleSheet("font-size: 13px; color: #555;")
+        self.sub_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        self.countdown_label = QLabel("5")
+        self.countdown_label.setStyleSheet("font-size: 48px; font-weight: bold; color: #1769aa;")
+        self.countdown_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        self.progress = QProgressBar()
+        self.progress.setRange(0, 5000)
+        self.progress.setValue(5000)
+        self.progress.setTextVisible(False)
+        self.progress.setFixedHeight(8)
+        
+        layout.addWidget(self.message_label)
+        layout.addWidget(self.sub_label)
+        layout.addWidget(self.countdown_label)
+        layout.addWidget(self.progress)
+        
+        self._remaining = 5000
+        self._timer = QTimer(self)
+        self._timer.timeout.connect(self._update_countdown)
+        self._timer.start(100)
+    
+    def _update_countdown(self) -> None:
+        self._remaining -= 100
+        if self._remaining <= 0:
+            self._timer.stop()
+            self.accept()
+            return
+        seconds = (self._remaining // 1000) + 1
+        self.countdown_label.setText(str(seconds))
+        self.progress.setValue(self._remaining)
 
 
 class ClickableLabel(QLabel):
@@ -560,7 +613,7 @@ class StudySetupPage(QWidget):
         self.summary.setWordWrap(True)
         layout.addWidget(self.summary)
 
-        self.start_button = QPushButton("🚀 Bắt đầu tự luyện")
+        self.start_button = QPushButton("Bắt đầu tự luyện")
         self.start_button.setObjectName("primaryButton")
         self.start_button.setMinimumSize(280, 54)
         self.start_button.clicked.connect(self._on_start_clicked)
@@ -617,11 +670,11 @@ class StudySetupPage(QWidget):
         if self.option_practice.radio.isChecked():
             self.content_stack.setCurrentIndex(0)
             self.summary.setText("120 tình huống · Luyện tập không giới hạn")
-            self.start_button.setText("🚀 Bắt đầu tự luyện")
+            self.start_button.setText("Bắt đầu tự luyện")
         else:
             self.content_stack.setCurrentIndex(1)
             self.summary.setText("10 tình huống · Cấu trúc chuẩn đề thi · 10 phút")
-            self.start_button.setText("🚀 Bắt đầu thi thử")
+            self.start_button.setText("Bắt đầu thi thử")
 
     def _on_start_clicked(self) -> None:
         """Handle start button click."""
@@ -1161,6 +1214,7 @@ class ExamSessionPage(QWidget):
             if self._state.situations[index].id not in completed_ids:
                 self._state.move_to(index)
                 self._render_current()
+                QTimer.singleShot(0, lambda: self._scroll_to_top())
                 return
 
     def _build_quick_navigation(self) -> None:
@@ -1268,14 +1322,20 @@ class ExamSessionPage(QWidget):
         )
         correct = sum(result.correct_parts for result in self._state.results)
         total = len(self._state.situations) * 4
-        self.finished.emit(final_score, correct, total, self._state.mode, reason)
+        mode = self._state.mode
+        
+        self._state = None
+        self._draft_selections.clear()
+        
+        QTimer.singleShot(0, lambda: self.finished.emit(final_score, correct, total, mode, reason))
 
     def _tick(self) -> None:
         self._remaining_seconds = max(0, self._remaining_seconds - 1)
         self._update_timer_label()
         if self._remaining_seconds == 0:
             self._timer.stop()
-            QMessageBox.information(self, "Hết thời gian", "Bài thi thử sẽ được tự động nộp.")
+            dialog = TimeUpDialog(self)
+            dialog.exec()
             self._finish_session("Hết thời gian")
 
     def _update_timer_label(self) -> None:
@@ -1300,21 +1360,39 @@ class ExamSessionPage(QWidget):
         self.player.play()
 
     def _confirm_exit(self) -> None:
+        if not self._is_exam_mode():
+            self._exit_without_score()
+            return
         answer = QMessageBox.question(
             self,
             "Thoát phiên",
-            "Bạn có chắc chắn muốn thoát không?",
+            "Bạn có chắc chắn muốn thoát không? Bài thi sẽ bị tính 0 điểm.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
         if answer == QMessageBox.StandardButton.Yes:
-            self._timer.stop()
-            self.player.stop()
-            if self._state is not None:
-                self.window().history_repository.discard_session(self._state.session_id)
-            self._state = None
-            self._draft_selections.clear()
-            self.exit_requested.emit()
+            self._finish_with_zero()
+
+    def _exit_without_score(self) -> None:
+        self._timer.stop()
+        self.player.stop()
+        if self._state is not None:
+            self.window().history_repository.discard_session(self._state.session_id)
+        self._state = None
+        self._draft_selections.clear()
+        self.exit_requested.emit()
+
+    def _finish_with_zero(self) -> None:
+        if self._is_finished or self._state is None:
+            return
+        self._is_finished = True
+        mode = self._state.mode
+        self._timer.stop()
+        self.player.stop()
+        self._state = None
+        self._draft_selections.clear()
+        
+        QTimer.singleShot(0, lambda: self.finished.emit(0.0, 0, 10, mode, "Đã thoát"))
 
     def _clear_questions(self) -> None:
         self._groups.clear()
@@ -1376,7 +1454,7 @@ class PracticeSessionPage(QWidget):
         layout.setSpacing(10)
 
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("🔍 Tìm kiếm...")
+        self.search_input.setPlaceholderText("Tìm kiếm...")
         self.search_input.textChanged.connect(self._on_search_changed)
         layout.addWidget(self.search_input)
 
@@ -1536,7 +1614,7 @@ class PracticeSessionPage(QWidget):
         self.reset_button.setObjectName("ghostButton")
         self.reset_button.setVisible(False)
         self.reset_button.clicked.connect(self._on_reset)
-        self.submit_button = QPushButton("✓ Kiểm tra đáp án")
+        self.submit_button = QPushButton("Kiểm tra đáp án")
         self.submit_button.setObjectName("primaryButton")
         self.submit_button.clicked.connect(self._submit)
         footer.addWidget(self.progress_label)
@@ -1846,7 +1924,7 @@ class PracticeSessionPage(QWidget):
             self.submit_button.setText(f"Còn {remaining} đáp án chưa chọn")
             self.submit_button.setEnabled(False)
         else:
-            self.submit_button.setText("✓ Kiểm tra đáp án")
+            self.submit_button.setText("Kiểm tra đáp án")
             self.submit_button.setEnabled(True)
 
     def _move_relative(self, offset: int) -> None:
@@ -1933,6 +2011,9 @@ class ResultPage(QWidget):
         self.score = QLabel()
         self.score.setObjectName("score")
         self.score.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.status = QLabel()
+        self.status.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.status.setStyleSheet("font-size: 20px; font-weight: bold;")
         self.detail = QLabel()
         self.detail.setObjectName("subtitle")
         self.detail.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -1946,6 +2027,7 @@ class ResultPage(QWidget):
         actions.addWidget(setup)
         layout.addWidget(self.title, alignment=Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.score)
+        layout.addWidget(self.status)
         layout.addWidget(self.detail)
         layout.addSpacing(24)
         layout.addLayout(actions)
@@ -1953,6 +2035,17 @@ class ResultPage(QWidget):
     def show_result(self, score: float, correct: int, total: int, mode: str, reason: str) -> None:
         self.title.setText("KẾT QUẢ THI THỬ" if mode == "mock_exam" else "KẾT QUẢ TỰ LUYỆN")
         self.score.setText(f"{score:.2f} / 10")
+        if mode == "mock_exam":
+            passed = "Đạt" if score >= 5 else "Trượt"
+            self.status.setText(passed)
+            self.status.setStyleSheet(
+                "font-size: 20px; font-weight: bold; color: #2ecc71;"
+                if score >= 5 else
+                "font-size: 20px; font-weight: bold; color: #e74c3c;"
+            )
+            self.status.setVisible(True)
+        else:
+            self.status.setVisible(False)
         self.detail.setText(f"Đúng {correct}/{total} phần · {reason}")
 
 
@@ -1960,11 +2053,11 @@ class HistoryDialog(QDialog):
     def __init__(self, history_repository: HistoryRepository, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Lịch sử ôn tập")
-        self.resize(860, 440)
+        self.resize(760, 440)
         layout = QVBoxLayout(self)
-        self.table = QTableWidget(0, 6)
+        self.table = QTableWidget(0, 5)
         self.table.setHorizontalHeaderLabels(
-            ["Thời gian", "Chế độ", "Số câu", "Điểm", "Thang 10", "Trạng thái"]
+            ["Thời gian", "Chế độ", "Số câu", "Điểm", "Trạng thái"]
         )
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
@@ -1972,7 +2065,7 @@ class HistoryDialog(QDialog):
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        for column in (2, 3, 4, 5):
+        for column in (2, 3, 4):
             header.setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
         for row_index, row in enumerate(history_repository.recent_sessions()):
             self.table.insertRow(row_index)
@@ -1981,7 +2074,6 @@ class HistoryDialog(QDialog):
                 "Tự luyện" if row["mode"] == "practice" else "Thi thử",
                 row["total_situations"],
                 self._format_score(row["score"]),
-                self._format_score(row["score_on_ten"]),
                 "Hoàn thành" if row["completed_at"] else "Chưa hoàn thành",
             ]
             for column, value in enumerate(values):
@@ -2112,7 +2204,7 @@ class MainWindow(QMainWindow):
         self, score: float, correct: int, total: int, mode: str, reason: str
     ) -> None:
         self.result_page.show_result(score, correct, total, mode, reason)
-        self.stack.slide_to_index(4, "left")
+        self.stack.slide_to_index(5, "left")
 
     def _show_history(self) -> None:
         HistoryDialog(self.history_repository, self).exec()

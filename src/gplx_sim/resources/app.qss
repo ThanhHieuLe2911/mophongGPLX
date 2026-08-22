@@ -338,13 +338,12 @@ QFrame#answerOption {
 }
 
 QFrame#answerOption:hover {
-    background: #e7eef6;
-    border-color: #c5d5e5;
+    border: 2px solid #4b91cf;
 }
 
 QFrame#answerOption[selected="true"] {
     background: #e5f1fc;
-    border-color: #4b91cf;
+    border: 2px solid #4b91cf;
 }
 
 QFrame#answerOption:disabled {
